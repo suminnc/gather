@@ -7,10 +7,8 @@ packages:
 overrides:
   "uWebSockets.js": "file:stubs/uwebsockets-stub"
 
-onlyBuiltDependencies:
-  - esbuild
-  - msgpackr-extract
-
+# Approve postinstall scripts (pnpm 11 fails CI installs when build
+# scripts are pending approval). esbuild needs it to place its binary.
 allowBuilds:
-  esbuild: set this to true or false
-  msgpackr-extract: set this to true or false
+  esbuild: true
+  msgpackr-extract: true
