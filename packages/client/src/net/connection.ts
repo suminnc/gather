@@ -120,15 +120,24 @@ export async function connect(
   });
 
   // Closing/refreshing the tab must leave the room immediately so other
-  // players don't see a ghost until the server's ping timeout.
+  // players don't see a ghost. Also force-close the socket: a frozen
+  // (bfcached/hidden) page keeps its WebSocket alive and answers pings
+  // at the network layer, so the server would never reap it.
   const onPageHide = () => {
     manager.destroy();
     void r.leave(true);
+    try {
+      (r as unknown as { connection?: { close?: () => void } }).connection?.close?.();
+    } catch {
+      // already closed
+    }
   };
   window.addEventListener("pagehide", onPageHide);
+  document.addEventListener("freeze", onPageHide);
 
   r.onLeave(() => {
     window.removeEventListener("pagehide", onPageHide);
+    document.removeEventListener("freeze", onPageHide);
     useStore.setState({ connected: false });
     manager.destroy();
   });

@@ -130,6 +130,16 @@ export class SpaceScene extends Phaser.Scene {
     }
     this.cameras.main.setZoom(2);
 
+    this.input.on(
+      Phaser.Input.Events.POINTER_WHEEL,
+      (_p: unknown, _over: unknown, _dx: number, dy: number) => {
+        const cam = this.cameras.main;
+        cam.setZoom(
+          Phaser.Math.Clamp(cam.zoom * (dy > 0 ? 1 / 1.15 : 1.15), 1, 4)
+        );
+      }
+    );
+
     this.zonePreview = this.add.graphics().setDepth(10000);
 
     this.input.on(Phaser.Input.Events.POINTER_DOWN, (p: Phaser.Input.Pointer) =>
@@ -302,6 +312,7 @@ export class SpaceScene extends Phaser.Scene {
             fontFamily: "monospace",
             fontSize: "10px",
             color: zone.color,
+            resolution: 4,
           })
           .setDepth(2)
       );
@@ -400,6 +411,8 @@ export class SpaceScene extends Phaser.Scene {
         color: id === this.myId ? "#9ee6a8" : "#ffffff",
         backgroundColor: "rgba(0,0,0,0.55)",
         padding: { x: 3, y: 1 },
+        // Render the texture at 4x so camera zoom doesn't blur it.
+        resolution: 4,
       })
       .setOrigin(0.5);
     const container = this.add
@@ -451,8 +464,13 @@ export class SpaceScene extends Phaser.Scene {
     if (!editor.active || !editor.draft) return;
     this.redrawDecor(editor.draft);
     this.spawnMarkers.forEach((m) => m.destroy());
+    // Rings below the players so a spawn under someone's feet doesn't
+    // read as a dot stuck on them.
     this.spawnMarkers = editor.draft.spawns.map((s) =>
-      this.add.circle(px(s.x), px(s.y), 5, 0x22cc88, 0.9).setDepth(9999)
+      this.add
+        .circle(px(s.x), px(s.y), 9, 0x22cc88, 0.15)
+        .setStrokeStyle(2, 0x22cc88, 0.9)
+        .setDepth(3)
     );
   }
 
