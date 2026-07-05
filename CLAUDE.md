@@ -12,6 +12,10 @@ A Gather.town-style virtual office: tile-based movement, proximity video/audio c
 
 Commands: `pnpm dev` (server :2567 + Vite :5173, auto-bumps if taken), `pnpm build`, `pnpm start` (prod on :2567), `pnpm typecheck`, `pnpm gen-assets` (regenerates placeholder art + default map). Note: `pnpm-workspace.yaml` stubs the git-hosted `uWebSockets.js` (unused transport pulled in as a colyseus peer dep) via `stubs/uwebsockets-stub`.
 
+## Deploy
+
+Pushed to `github.com/suminnc/gather`. `render.yaml` deploys everything as one free Render web service (connect the repo as a Blueprint at dashboard.render.com). WebRTC uses Google STUN + Open Relay free TURN so calls work across NATs. Free-tier limits: spins down after ~15 min idle; ephemeral disk (map edits reset on restart).
+
 ## Status
 
 - **2026-07-05** — Client built end-to-end (join flow, movement, proximity calls, zone isolation, chat, screen share, map editor). Verified with two clients: movement/collision sync, proximity link/unlink + zone rules, both chat scopes, editor save → live rebuild on other clients + disk persistence, prod serve from :2567. Not yet human-verified: actual camera/mic/screen media flow (automation tabs can't grant `getUserMedia`); the signaling/link layer and no-media degradation are verified. No tests, no STUN/TURN beyond Google STUN, no auth.
