@@ -14,7 +14,7 @@ Commands: `pnpm dev` (server :2567 + Vite :5173, auto-bumps if taken), `pnpm bui
 
 ## Deploy
 
-Pushed to `github.com/suminnc/gather`. Split deploy: static client on Vercel (`vercel.json` — set `VITE_SERVER_URL` to the server's URL), Colyseus server on Render free (`render.yaml`; Vercel cannot host it — serverless, no persistent WebSockets). Single-server fallback: the Render service alone serves the built client same-origin when `VITE_SERVER_URL` is unset. WebRTC uses Google STUN + Open Relay free TURN so calls work across NATs. Free-tier limits: Render spins down after ~15 min idle; ephemeral disk (map edits reset on restart). pnpm 11 note: build-script approvals live in `allowBuilds` in pnpm-workspace.yaml.
+Pushed to `github.com/suminnc/gather`. **Live**: client at https://gather-two-jet.vercel.app (Vercel project `gather`, `VITE_SERVER_URL` env set in production), server at https://gather-tguw.onrender.com (Render free). Redeploy client: `npx vercel deploy --prod`. Split deploy because Vercel cannot host the Colyseus server (serverless, no persistent WebSockets). Single-server fallback: the Render service alone serves the built client same-origin when `VITE_SERVER_URL` is unset. WebRTC uses Google STUN + Open Relay free TURN so calls work across NATs. Free-tier limits: Render spins down after ~15 min idle; ephemeral disk (map edits reset on restart). pnpm 11 note: build-script approvals live in `allowBuilds` in pnpm-workspace.yaml.
 
 ## Status
 
