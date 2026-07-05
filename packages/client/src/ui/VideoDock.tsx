@@ -1,14 +1,17 @@
 import { useEffect, useRef } from "react";
-import { useStore } from "../store";
+import { CONNECT_DIST, DISCONNECT_DIST } from "@gather/shared";
+import { useStore, type PlayerInfo } from "../store";
 
 function StreamView({
   stream,
   muted,
   mirrored,
+  volume = 1,
 }: {
   stream: MediaStream;
   muted: boolean;
   mirrored?: boolean;
+  volume?: number;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -22,6 +25,9 @@ function StreamView({
     document.addEventListener("pointerdown", play, { once: true });
     return () => document.removeEventListener("pointerdown", play);
   }, [stream]);
+  useEffect(() => {
+    if (ref.current) ref.current.volume = volume;
+  }, [volume]);
   return (
     <video
       ref={ref}
@@ -31,6 +37,20 @@ function StreamView({
       className={mirrored ? "mirrored" : undefined}
     />
   );
+}
+
+/**
+ * Gather-style proximity fade: full presence up close, fading linearly
+ * until silent right where the server drops the link. Same private zone
+ * never fades.
+ */
+function fadeFactor(me?: PlayerInfo, peer?: PlayerInfo): number {
+  if (!me || !peer) return 1;
+  if (me.zoneId !== "" && me.zoneId === peer.zoneId) return 1;
+  const d = Math.max(Math.abs(me.x - peer.x), Math.abs(me.y - peer.y));
+  const fadeStart = CONNECT_DIST - 1;
+  if (d <= fadeStart) return 1;
+  return Math.max(0, (DISCONNECT_DIST - d) / (DISCONNECT_DIST - fadeStart));
 }
 
 export function VideoDock() {
@@ -85,13 +105,18 @@ export function VideoDock() {
       {cams.map(([id, m]) => {
         const p = players.get(id);
         const camOn = (p?.camOn ?? true) && m.camStream;
+        const fade = fadeFactor(players.get(sessionId), p);
         return (
-          <div key={id} className="tile">
+          <div
+            key={id}
+            className="tile"
+            style={{ opacity: 0.3 + 0.7 * fade }}
+          >
             {/* The cam stream also carries the peer's audio, so it stays
                 mounted (hidden) even while their camera is off. */}
             {m.camStream && (
               <div className={camOn ? undefined : "hidden-video"}>
-                <StreamView stream={m.camStream} muted={false} />
+                <StreamView stream={m.camStream} muted={false} volume={fade} />
               </div>
             )}
             {!camOn && (
