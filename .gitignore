@@ -8,3 +8,6 @@ data/maps/*.json
 !data/maps/default.json
 packages/server/data/maps/*.json
 !packages/server/data/maps/default.json
+.vercel
+.env*
+.env.local
