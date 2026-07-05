@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import type { ChatScope } from "@gather/shared";
 import { sendChat } from "../net/connection";
 import { useStore } from "../store";
+import { IS_TOUCH_DEVICE } from "./TouchControls";
 
 export function ChatPanel() {
   const chat = useStore((s) => s.chat);
   const sessionId = useStore((s) => s.sessionId);
   const [scope, setScope] = useState<ChatScope>("nearby");
   const [text, setText] = useState("");
-  const [open, setOpen] = useState(true);
+  // Phones don't have room for an always-open chat next to the D-pad.
+  const [open, setOpen] = useState(!IS_TOUCH_DEVICE);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

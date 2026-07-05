@@ -7,6 +7,7 @@ import { Hud } from "./ui/Hud";
 import { ChatPanel } from "./ui/ChatPanel";
 import { VideoDock } from "./ui/VideoDock";
 import { MediaControls } from "./ui/MediaControls";
+import { TouchControls } from "./ui/TouchControls";
 import { EditorPanel } from "./editor/EditorPanel";
 
 const slugify = (s: string) =>
@@ -143,6 +144,7 @@ function SpaceView() {
       <VideoDock />
       <ChatPanel />
       <MediaControls />
+      <TouchControls />
       {editing && <EditorPanel />}
       {toast && <div className="toast">{toast}</div>}
       {!connected && <div className="disconnected">Disconnected — reload to rejoin</div>}

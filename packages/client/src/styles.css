@@ -491,6 +491,55 @@ input:focus {
   flex: 1;
 }
 
+/* ---------- touch controls ---------- */
+
+.touch-pad {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 4px;
+  z-index: 15;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pad-btn {
+  font-size: 20px;
+  background: rgba(42, 46, 56, 0.75);
+  border: 1px solid rgba(58, 63, 77, 0.9);
+  border-radius: 10px;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pad-btn.active {
+  background: #3d5afe;
+}
+
+.pad-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.pad-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.pad-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.pad-down {
+  grid-column: 2;
+  grid-row: 3;
+}
+
 /* ---------- toast ---------- */
 
 .toast {

@@ -70,6 +70,8 @@ interface GatherStore {
   chat: ChatMessage[];
   /** True while a text input has focus, so the scene ignores WASD. */
   typingLock: boolean;
+  /** Direction held on the mobile D-pad; null when released. */
+  touchDir: Direction | null;
   media: MediaState;
   localStream: MediaStream | null;
   screenStream: MediaStream | null;
@@ -99,6 +101,7 @@ export const useStore = create<GatherStore>()(
       players: new Map(),
       chat: [],
       typingLock: false,
+      touchDir: null,
       media: {
         hasMedia: false,
         denied: false,

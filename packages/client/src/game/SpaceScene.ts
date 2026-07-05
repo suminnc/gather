@@ -434,7 +434,7 @@ export class SpaceScene extends Phaser.Scene {
     if (k.DOWN.isDown || k.S.isDown) return "down";
     if (k.LEFT.isDown || k.A.isDown) return "left";
     if (k.RIGHT.isDown || k.D.isDown) return "right";
-    return null;
+    return useStore.getState().touchDir;
   }
 
   // ---------- editor ----------
