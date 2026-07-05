@@ -25,8 +25,13 @@ import { PeerManager } from "../rtc/PeerManager";
 let room: Room | null = null;
 export let peers: PeerManager | null = null;
 
-// Dev: Vite serves the app on :5173 while the game server runs on :2567.
-const httpBase = import.meta.env.DEV ? `http://${location.hostname}:2567` : "";
+// Where the game server lives. Priority: explicit VITE_SERVER_URL (set
+// when the client is hosted separately, e.g. Vercel + Render server),
+// then the :2567 dev server, then same-origin (single-server deploys).
+const httpBase = (
+  (import.meta.env.VITE_SERVER_URL as string | undefined) ??
+  (import.meta.env.DEV ? `http://${location.hostname}:2567` : "")
+).replace(/\/+$/, "");
 
 export interface SpaceListing {
   spaceId: string;
@@ -45,9 +50,7 @@ export async function connect(
   name: string,
   avatar: string
 ): Promise<void> {
-  const endpoint = import.meta.env.DEV
-    ? `ws://${location.hostname}:2567`
-    : location.origin.replace(/^http/, "ws");
+  const endpoint = (httpBase || location.origin).replace(/^http/, "ws");
   const client = new Client(endpoint);
   const r = await client.joinOrCreate("space", { spaceId, name, avatar });
   room = r;
