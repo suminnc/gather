@@ -95,12 +95,16 @@ input:focus {
 
 .avatar-grid {
   display: flex;
-  justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 12px 8px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #3a3f4d transparent;
 }
 
 .avatar-opt {
-  padding: 6px;
+  flex: 0 0 auto;
+  padding: 10px;
   border-radius: 8px;
   line-height: 0;
 }
@@ -121,6 +125,37 @@ input:focus {
 
 .join-btn {
   padding: 10px;
+}
+
+.ws-section {
+  border-top: 1px solid #2a2e38;
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.ws-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #9aa2b1;
+}
+
+.ws-or {
+  margin-top: 2px;
+}
+
+.ws-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #9aa2b1;
+  line-height: 1.45;
+}
+
+.ws-section input {
+  width: 100%;
 }
 
 .space-list {

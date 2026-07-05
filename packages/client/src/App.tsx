@@ -89,39 +89,57 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
             </button>
           ))}
         </div>
-        <input
-          placeholder="Workspace (new or existing)"
-          value={space}
-          maxLength={32}
-          onChange={(e) => setSpace(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void join();
-          }}
-        />
-        {spaces.length > 0 && (
-          <div className="space-list">
-            {spaces.map((s) => (
-              <button
-                key={s.spaceId}
-                className={`space-opt ${
-                  slugify(space) === s.spaceId ? "selected" : ""
-                }`}
-                onClick={() => setSpace(s.spaceId)}
-              >
-                {s.spaceId}
-                <span className="space-count">
-                  {s.clients}/{s.maxClients}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="ws-section">
+          <div className="ws-title">Join a workspace</div>
+          {spaces.length > 0 ? (
+            <div className="space-list">
+              {spaces.map((s) => (
+                <button
+                  key={s.spaceId}
+                  className={`space-opt ${
+                    slugify(space) === s.spaceId ? "selected" : ""
+                  }`}
+                  onClick={() => setSpace(s.spaceId)}
+                >
+                  <span>
+                    {slugify(space) === s.spaceId ? "✓ " : ""}
+                    {s.spaceId}
+                  </span>
+                  <span className="space-count">
+                    {s.clients}/{s.maxClients} online
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="ws-empty">
+              Nobody is online yet — start a workspace below and invite
+              people with its link.
+            </p>
+          )}
+          <div className="ws-title ws-or">or create your own</div>
+          <input
+            placeholder="new-workspace-name"
+            value={space}
+            maxLength={32}
+            onChange={(e) => setSpace(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void join();
+            }}
+          />
+        </div>
         <button
           className="primary join-btn"
           disabled={!name.trim() || joining}
           onClick={() => void join()}
         >
-          {joining ? "Joining…" : `Join ${slugify(space) || "lobby"}`}
+          {joining
+            ? "Joining…"
+            : `${
+                spaces.some((s) => s.spaceId === (slugify(space) || "lobby"))
+                  ? "Join"
+                  : "Create"
+              } ${slugify(space) || "lobby"}`}
         </button>
         {error && <p className="join-error">{error}</p>}
       </div>

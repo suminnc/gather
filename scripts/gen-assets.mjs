@@ -218,14 +218,22 @@ mkdirSync(path.join(ASSETS, "tiles"), { recursive: true });
 tiles.save(path.join(ASSETS, "tiles", "tiles.png"));
 
 // ---------- avatars: 3 frames x 4 directions (down,left,right,up), 32px ----------
-const AVATAR_COLORS = ["#e05d5d", "#4e8fe0", "#58b368", "#d8a13c", "#9a5fb5", "#48b5ad"];
+const AVATAR_COLORS = [
+  "#e05d5d", "#4e8fe0", "#58b368", "#d8a13c", "#9a5fb5", "#48b5ad",
+  "#d96aa8", "#8fbf4d", "#7e8ca0", "#d8c84a", "#6a5fd9", "#e0813d",
+];
 mkdirSync(path.join(ASSETS, "avatars"), { recursive: true });
 
 AVATAR_COLORS.forEach((shirtHex, idx) => {
   const c = new Canvas(3 * T, 4 * T);
   const shirt = hex(shirtHex);
   const skin = hex(idx % 2 === 0 ? "#f0c8a0" : "#c68e5e");
-  const hair = hex(["#3e2b17", "#1c1c1c", "#7a5330", "#5d3a66", "#26323e", "#822f2f"][idx]);
+  const hair = hex(
+    [
+      "#3e2b17", "#1c1c1c", "#7a5330", "#5d3a66", "#26323e", "#822f2f",
+      "#f0e6d2", "#2e4a1f", "#4a3020", "#703a10", "#c0c8d8", "#302818",
+    ][idx]
+  );
   const pants = hex("#37474f");
   for (let row = 0; row < 4; row++) {
     for (let frame = 0; frame < 3; frame++) {
@@ -341,4 +349,6 @@ const map = {
 mkdirSync(MAPS, { recursive: true });
 writeFileSync(path.join(MAPS, "default.json"), JSON.stringify(map, null, 2));
 
-console.log("generated: tiles.png, 6 avatar sheets, default.json");
+console.log(
+  `generated: tiles.png, ${AVATAR_COLORS.length} avatar sheets, default.json`
+);
