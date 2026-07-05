@@ -14,7 +14,21 @@ export interface Signaling {
 }
 
 const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    // Open Relay (metered.ca) free TURN. STUN alone can't connect peers
+    // behind symmetric NATs, which is the common "calls work on
+    // localhost but not in production" failure.
+    {
+      urls: [
+        "turn:staticauth.openrelay.metered.ca:80",
+        "turn:staticauth.openrelay.metered.ca:443",
+        "turn:staticauth.openrelay.metered.ca:443?transport=tcp",
+      ],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
 };
 
 interface PeerConn {

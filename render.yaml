@@ -1,0 +1,17 @@
+# Render.com blueprint — deploys the whole app as one free web service:
+# the Node server serves the built client and hosts the Colyseus rooms.
+#
+# Free-tier caveats: the instance spins down after ~15 min idle (first
+# visitor waits for a cold start) and the disk is ephemeral, so editor
+# map saves reset on redeploy/restart.
+services:
+  - type: web
+    name: gather
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && corepack prepare pnpm@11.10.0 --activate && pnpm install && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
