@@ -21,6 +21,36 @@ const DIR_DELTA: Record<Direction, [number, number]> = {
 
 const px = (tile: number) => tile * TILE_SIZE + TILE_SIZE / 2;
 
+/** Bresenham line between two tiles, inclusive of both endpoints. */
+function lineTiles(
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number
+): Array<[number, number]> {
+  const tiles: Array<[number, number]> = [];
+  const dx = Math.abs(x1 - x0);
+  const dy = -Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx + dy;
+  let x = x0;
+  let y = y0;
+  for (;;) {
+    tiles.push([x, y]);
+    if (x === x1 && y === y1) return tiles;
+    const e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y += sy;
+    }
+  }
+}
+
 interface PlayerEntry {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
@@ -52,6 +82,8 @@ export class SpaceScene extends Phaser.Scene {
 
   private zoneDragStart: { x: number; y: number } | null = null;
   private zonePreview?: Phaser.GameObjects.Graphics;
+  /** Last tile painted in the current drag, for stroke interpolation. */
+  private lastPaint: { x: number; y: number } | null = null;
 
   constructor() {
     super("space");
@@ -445,27 +477,24 @@ export class SpaceScene extends Phaser.Scene {
     const tx = Math.floor(world.x / TILE_SIZE);
     const ty = Math.floor(world.y / TILE_SIZE);
     if (tx < 0 || ty < 0 || tx >= draft.width || ty >= draft.height) return;
-    const i = tileIndex(draft, tx, ty);
 
     switch (editor.tool) {
       case "floor":
-        if (draft.layers.floor[i] === editor.gid) return;
-        draft.layers.floor[i] = editor.gid;
-        this.floorLayer!.putTileAt(editor.gid, tx, ty);
-        bumpDraft();
-        break;
       case "wall":
-        if (draft.layers.walls[i] === editor.gid) return;
-        draft.layers.walls[i] = editor.gid;
-        this.wallsLayer!.putTileAt(editor.gid, tx, ty);
-        bumpDraft();
+      case "eraseWall": {
+        // Fast drags skip tiles between pointer events; paint the whole
+        // stroke from the previous position.
+        const from = isDown || !this.lastPaint ? { x: tx, y: ty } : this.lastPaint;
+        let changed = false;
+        for (const [px_, py_] of lineTiles(from.x, from.y, tx, ty)) {
+          if (this.paintTile(draft, editor.tool, editor.gid, px_, py_)) {
+            changed = true;
+          }
+        }
+        this.lastPaint = { x: tx, y: ty };
+        if (changed) bumpDraft();
         break;
-      case "eraseWall":
-        if (draft.layers.walls[i] === -1) return;
-        draft.layers.walls[i] = -1;
-        this.wallsLayer!.removeTileAt(tx, ty);
-        bumpDraft();
-        break;
+      }
       case "object": {
         if (!isDown) return;
         draft.objects = draft.objects.filter((o) => o.x !== tx || o.y !== ty);
@@ -518,7 +547,38 @@ export class SpaceScene extends Phaser.Scene {
     }
   }
 
+  private paintTile(
+    draft: MapDoc,
+    tool: "floor" | "wall" | "eraseWall",
+    gid: number,
+    tx: number,
+    ty: number
+  ): boolean {
+    if (tx < 0 || ty < 0 || tx >= draft.width || ty >= draft.height) {
+      return false;
+    }
+    const i = tileIndex(draft, tx, ty);
+    switch (tool) {
+      case "floor":
+        if (draft.layers.floor[i] === gid) return false;
+        draft.layers.floor[i] = gid;
+        this.floorLayer!.putTileAt(gid, tx, ty);
+        return true;
+      case "wall":
+        if (draft.layers.walls[i] === gid) return false;
+        draft.layers.walls[i] = gid;
+        this.wallsLayer!.putTileAt(gid, tx, ty);
+        return true;
+      case "eraseWall":
+        if (draft.layers.walls[i] === -1) return false;
+        draft.layers.walls[i] = -1;
+        this.wallsLayer!.removeTileAt(tx, ty);
+        return true;
+    }
+  }
+
   private onEditorPointerUp(): void {
+    this.lastPaint = null;
     if (!this.zoneDragStart) return;
     const { editor } = useStore.getState();
     this.zonePreview?.clear();
