@@ -12,9 +12,15 @@ function StreamView({
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
-    if (ref.current && ref.current.srcObject !== stream) {
-      ref.current.srcObject = stream;
-    }
+    const el = ref.current;
+    if (!el) return;
+    if (el.srcObject !== stream) el.srcObject = stream;
+    // Autoplay can be denied despite the attribute (e.g. stale user
+    // activation); retry explicitly and again on the next interaction.
+    const play = () => el.play().catch(() => {});
+    play();
+    document.addEventListener("pointerdown", play, { once: true });
+    return () => document.removeEventListener("pointerdown", play);
   }, [stream]);
   return (
     <video

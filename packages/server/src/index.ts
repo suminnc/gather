@@ -26,7 +26,13 @@ app.get(["/", "/space/:id"], (_req, res) => {
 
 const server = http.createServer(app);
 const gameServer = new Server({
-  transport: new WebSocketTransport({ server }),
+  transport: new WebSocketTransport({
+    server,
+    // WebRTC SDP relays and full map:save payloads exceed ws's small
+    // default maxPayload, and ws hard-closes the socket when a frame
+    // does — which drops the player mid-session.
+    maxPayload: 1024 * 1024,
+  }),
 });
 
 gameServer.define("space", SpaceRoom).filterBy(["spaceId"]);

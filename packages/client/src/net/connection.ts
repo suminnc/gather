@@ -45,6 +45,7 @@ export async function connect(
     screenStop: () => r.send(MSG.screenStop),
   });
   peers = manager;
+  if (import.meta.env.DEV) (window as any).__peers = manager;
 
   // The client has no schema classes; state arrives via reflection, so the
   // callback proxy and state are used untyped.
