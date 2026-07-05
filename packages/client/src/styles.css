@@ -123,6 +123,40 @@ input:focus {
   padding: 10px;
 }
 
+.space-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.space-opt {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.space-opt.selected {
+  border-color: #3d5afe;
+}
+
+.space-count {
+  color: #9aa2b1;
+  font-size: 12px;
+}
+
+.media-warning {
+  width: 200px;
+  background: #3a2a1a;
+  border: 1px solid #7a5a2a;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .join-error {
   margin: 0;
   color: #ff7676;

@@ -25,12 +25,26 @@ import { PeerManager } from "../rtc/PeerManager";
 let room: Room | null = null;
 export let peers: PeerManager | null = null;
 
+// Dev: Vite serves the app on :5173 while the game server runs on :2567.
+const httpBase = import.meta.env.DEV ? `http://${location.hostname}:2567` : "";
+
+export interface SpaceListing {
+  spaceId: string;
+  clients: number;
+  maxClients: number;
+}
+
+export async function fetchSpaces(): Promise<SpaceListing[]> {
+  const res = await fetch(`${httpBase}/api/spaces`);
+  if (!res.ok) return [];
+  return (await res.json()) as SpaceListing[];
+}
+
 export async function connect(
   spaceId: string,
   name: string,
   avatar: string
 ): Promise<void> {
-  // Dev: Vite serves the app on :5173 while the game server runs on :2567.
   const endpoint = import.meta.env.DEV
     ? `ws://${location.hostname}:2567`
     : location.origin.replace(/^http/, "ws");
@@ -105,7 +119,16 @@ export async function connect(
     }
   });
 
+  // Closing/refreshing the tab must leave the room immediately so other
+  // players don't see a ghost until the server's ping timeout.
+  const onPageHide = () => {
+    manager.destroy();
+    void r.leave(true);
+  };
+  window.addEventListener("pagehide", onPageHide);
+
   r.onLeave(() => {
+    window.removeEventListener("pagehide", onPageHide);
     useStore.setState({ connected: false });
     manager.destroy();
   });

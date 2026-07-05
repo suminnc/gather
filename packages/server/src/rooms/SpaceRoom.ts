@@ -39,6 +39,7 @@ export class SpaceRoom extends Room<SpaceState> {
   async onCreate(options: JoinOptions) {
     this.setState(new SpaceState());
     this.spaceId = options.spaceId || "lobby";
+    await this.setMetadata({ spaceId: this.spaceId });
     this.map = await loadMap(this.spaceId);
     this.state.mapJson = JSON.stringify(this.map);
     this.state.mapVersion = 1;

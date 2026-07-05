@@ -52,6 +52,8 @@ export interface EditorState {
 
 export interface MediaState {
   hasMedia: boolean;
+  /** getUserMedia failed (permission denied / no device / in use). */
+  denied: boolean;
   micOn: boolean;
   camOn: boolean;
   sharing: boolean;
@@ -97,7 +99,13 @@ export const useStore = create<GatherStore>()(
       players: new Map(),
       chat: [],
       typingLock: false,
-      media: { hasMedia: false, micOn: false, camOn: false, sharing: false },
+      media: {
+        hasMedia: false,
+        denied: false,
+        micOn: false,
+        camOn: false,
+        sharing: false,
+      },
       localStream: null,
       screenStream: null,
       peers: new Map(),

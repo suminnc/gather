@@ -56,12 +56,25 @@ export class PeerManager {
       }
       useStore.setState((s) => ({
         localStream: stream,
-        media: { ...s.media, hasMedia: true, micOn: true, camOn: true },
+        media: {
+          ...s.media,
+          hasMedia: true,
+          denied: false,
+          micOn: true,
+          camOn: true,
+        },
       }));
       this.signal.mediaState(true, true);
-    } catch {
+    } catch (err) {
+      console.warn("getUserMedia failed:", err);
       useStore.setState((s) => ({
-        media: { ...s.media, hasMedia: false, micOn: false, camOn: false },
+        media: {
+          ...s.media,
+          hasMedia: false,
+          denied: true,
+          micOn: false,
+          camOn: false,
+        },
       }));
       this.signal.mediaState(false, false);
     }

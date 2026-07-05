@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
-import { Server } from "colyseus";
+import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { SpaceRoom } from "./rooms/SpaceRoom";
 
@@ -15,6 +15,18 @@ const app = express();
 // Dev: the Vite client on :5173 does cross-origin matchmaking requests.
 app.use(cors());
 app.get("/healthz", (_req, res) => res.send("ok"));
+
+// Active workspaces for the join screen.
+app.get("/api/spaces", async (_req, res) => {
+  const rooms = await matchMaker.query({ name: "space" });
+  res.json(
+    rooms.map((r) => ({
+      spaceId: (r.metadata as { spaceId?: string } | undefined)?.spaceId ?? "",
+      clients: r.clients,
+      maxClients: r.maxClients,
+    }))
+  );
+});
 
 // Production: serve the built client + SPA fallback for /space/* routes.
 app.use(express.static(CLIENT_DIST));

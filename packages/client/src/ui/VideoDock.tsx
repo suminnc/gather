@@ -35,6 +35,7 @@ function StreamView({
 
 export function VideoDock() {
   const localStream = useStore((s) => s.localStream);
+  const screenStream = useStore((s) => s.screenStream);
   const media = useStore((s) => s.media);
   const peers = useStore((s) => s.peers);
   const players = useStore((s) => s.players);
@@ -46,6 +47,20 @@ export function VideoDock() {
 
   return (
     <div className="video-dock">
+      {media.denied && (
+        <div className="media-warning">
+          ⚠️ Camera/mic unavailable — check the site permissions in your
+          browser, then reload.
+        </div>
+      )}
+
+      {screenStream && (
+        <div className="tile screen">
+          <StreamView stream={screenStream} muted />
+          <span className="tile-name">🖥️ your screen</span>
+        </div>
+      )}
+
       {screens.map(([id, m]) => (
         <div key={`screen-${id}`} className="tile screen">
           <StreamView stream={m.screenStream!} muted />

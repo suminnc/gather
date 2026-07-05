@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { enterEditor, exitEditor, useStore } from "../store";
 
 export function Hud() {
+  const [copied, setCopied] = useState(false);
   const spaceId = useStore((s) => s.spaceId);
   const connected = useStore((s) => s.connected);
   const editing = useStore((s) => s.editor.active);
@@ -15,6 +17,17 @@ export function Hud() {
       <span className={`dot ${connected ? "on" : "off"}`} />
       <span className="hud-space">{spaceId}</span>
       {zoneName && <span className="hud-zone">{zoneName}</span>}
+      <button
+        title="Copy an invite link to this workspace"
+        onClick={() => {
+          void navigator.clipboard.writeText(location.href).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          });
+        }}
+      >
+        {copied ? "Copied!" : "Invite"}
+      </button>
       <button
         className={editing ? "active" : ""}
         onClick={() => (editing ? exitEditor() : enterEditor())}

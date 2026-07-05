@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AVATARS } from "@gather/shared";
-import { connect } from "./net/connection";
+import { connect, fetchSpaces, type SpaceListing } from "./net/connection";
 import { useStore } from "./store";
 import { GameCanvas } from "./game/GameCanvas";
 import { Hud } from "./ui/Hud";
@@ -9,6 +9,14 @@ import { VideoDock } from "./ui/VideoDock";
 import { MediaControls } from "./ui/MediaControls";
 import { EditorPanel } from "./editor/EditorPanel";
 
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 32);
+
 function JoinScreen({ spaceId }: { spaceId: string }) {
   const [name, setName] = useState(
     () => localStorage.getItem("gather:name") ?? ""
@@ -16,18 +24,36 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
   const [avatar, setAvatar] = useState(
     () => localStorage.getItem("gather:avatar") ?? AVATARS[0]
   );
+  const [space, setSpace] = useState(spaceId);
+  const [spaces, setSpaces] = useState<SpaceListing[]>([]);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let alive = true;
+    const load = () =>
+      fetchSpaces()
+        .then((list) => alive && setSpaces(list))
+        .catch(() => {});
+    load();
+    const timer = setInterval(load, 5000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   const join = async () => {
     const trimmed = name.trim();
+    const target = slugify(space) || "lobby";
     if (!trimmed || joining) return;
     setJoining(true);
     setError(null);
     localStorage.setItem("gather:name", trimmed);
     localStorage.setItem("gather:avatar", avatar);
+    history.replaceState(null, "", `/space/${target}`);
     try {
-      await connect(spaceId, trimmed, avatar);
+      await connect(target, trimmed, avatar);
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to connect");
       setJoining(false);
@@ -38,9 +64,6 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
     <div className="join-screen">
       <div className="join-card">
         <h1>gather</h1>
-        <p className="join-space">
-          joining <strong>{spaceId}</strong>
-        </p>
         <input
           autoFocus
           placeholder="Your name"
@@ -65,12 +88,39 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
             </button>
           ))}
         </div>
+        <input
+          placeholder="Workspace (new or existing)"
+          value={space}
+          maxLength={32}
+          onChange={(e) => setSpace(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void join();
+          }}
+        />
+        {spaces.length > 0 && (
+          <div className="space-list">
+            {spaces.map((s) => (
+              <button
+                key={s.spaceId}
+                className={`space-opt ${
+                  slugify(space) === s.spaceId ? "selected" : ""
+                }`}
+                onClick={() => setSpace(s.spaceId)}
+              >
+                {s.spaceId}
+                <span className="space-count">
+                  {s.clients}/{s.maxClients}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <button
           className="primary join-btn"
           disabled={!name.trim() || joining}
           onClick={() => void join()}
         >
-          {joining ? "Joining…" : "Join space"}
+          {joining ? "Joining…" : `Join ${slugify(space) || "lobby"}`}
         </button>
         {error && <p className="join-error">{error}</p>}
       </div>
