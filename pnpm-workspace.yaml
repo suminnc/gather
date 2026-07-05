@@ -1,0 +1,16 @@
+packages:
+  - "packages/*"
+
+# @colyseus/uwebsockets-transport is an auto-installed peer of colyseus that we
+# never use (the server runs @colyseus/ws-transport). Its git-hosted
+# uWebSockets.js dependency trips blockExoticSubdeps, so stub it out.
+overrides:
+  "uWebSockets.js": "file:stubs/uwebsockets-stub"
+
+onlyBuiltDependencies:
+  - esbuild
+  - msgpackr-extract
+
+allowBuilds:
+  esbuild: set this to true or false
+  msgpackr-extract: set this to true or false

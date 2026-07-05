@@ -1,0 +1,17 @@
+{
+  "name": "gather",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"pnpm --filter @gather/server dev\" \"pnpm --filter @gather/client dev\"",
+    "build": "pnpm --filter @gather/client build",
+    "start": "pnpm --filter @gather/server start",
+    "typecheck": "pnpm -r typecheck",
+    "gen-assets": "node scripts/gen-assets.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3"
+  }
+}

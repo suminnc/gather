@@ -1,0 +1,7 @@
+{
+  "name": "uwebsockets-stub",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Empty stand-in for the git-hosted uWebSockets.js pulled in by @colyseus/uwebsockets-transport (an auto-installed peer of colyseus we never use — the server runs @colyseus/ws-transport). Overridden in the root package.json so pnpm's blockExoticSubdeps guard stays on.",
+  "main": "index.js"
+}

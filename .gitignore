@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+.env
+.claude/settings.local.json
+data/maps/*.json
+!data/maps/default.json
+packages/server/data/maps/*.json
+!packages/server/data/maps/default.json
