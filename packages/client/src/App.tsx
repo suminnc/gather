@@ -117,12 +117,16 @@ function JoinScreen({
     };
   }, [cfg, auth]);
 
+  // `guest` must be a dependency: leaving guest mode re-mounts the button
+  // container, and without a re-run the gate shows an empty gap.
   useEffect(() => {
-    if (!cfg?.auth || auth || !googleBtn.current) return;
+    if (!cfg?.auth || auth || guest || !googleBtn.current) return;
     const clientId =
       cfg.googleClientIds?.[location.origin] ?? cfg.googleClientId;
-    void renderGoogleButton(clientId, googleBtn.current, setAuth);
-  }, [cfg, auth]);
+    renderGoogleButton(clientId, googleBtn.current, setAuth).catch(() =>
+      setError("Couldn't load Google sign-in — check your connection.")
+    );
+  }, [cfg, auth, guest]);
 
   // Default the display name to the Google profile name.
   useEffect(() => {
@@ -205,6 +209,7 @@ function JoinScreen({
               onClick={() => {
                 sessionStorage.setItem("gather:guest", "1");
                 setGuest(true);
+                setError(null);
               }}
             >
               or continue as guest
@@ -226,6 +231,7 @@ function JoinScreen({
                   sessionStorage.removeItem("gather:guest");
                   setGuest(false);
                 }
+                setError(null);
               }}
             >
               {auth ? "sign out" : "sign in instead"}
