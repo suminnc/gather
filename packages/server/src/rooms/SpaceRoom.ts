@@ -17,8 +17,9 @@ import {
   type MoveMessage,
   type RtcSendMessage,
   type ScreenAnnounceMessage,
+  type TheaterMessage,
 } from "@gather/shared";
-import { Player, SpaceState } from "./schema/SpaceState";
+import { Player, SpaceState, TheaterState } from "./schema/SpaceState";
 import { computeLinkDiff } from "../logic/proximity";
 import { loadMap, saveMap } from "../maps/store";
 import { authEnabled, verifyIdToken, type AuthUser } from "../auth/google";
@@ -95,6 +96,9 @@ export class SpaceRoom extends Room<SpaceState> {
     });
     this.onMessage(MSG.mapSave, (client, msg: { map: unknown }) =>
       this.handleMapSave(client, msg)
+    );
+    this.onMessage(MSG.theater, (client, msg: TheaterMessage) =>
+      this.handleTheater(client, msg)
     );
 
     this.clock.setInterval(() => this.proximityTick(), PROXIMITY_TICK_MS);
@@ -197,7 +201,8 @@ export class SpaceRoom extends Room<SpaceState> {
     if (!sender) return;
     const text = String(msg.text ?? "").slice(0, 500).trim();
     if (!text) return;
-    const scope = msg.scope === "nearby" ? "nearby" : "everyone";
+    const scope =
+      msg.scope === "nearby" || msg.scope === "dm" ? msg.scope : "everyone";
     const chat: ChatMessage = {
       id: nanoid(8),
       from: client.sessionId,
@@ -206,6 +211,16 @@ export class SpaceRoom extends Room<SpaceState> {
       text,
       ts: Date.now(),
     };
+    if (scope === "dm") {
+      const target = this.clients.find((c) => c.sessionId === msg.to);
+      const targetPlayer = msg.to ? this.state.players.get(msg.to) : undefined;
+      if (!target || !targetPlayer || msg.to === client.sessionId) return;
+      chat.to = msg.to;
+      chat.toName = targetPlayer.name;
+      target.send(MSG.chatNew, chat);
+      client.send(MSG.chatNew, chat);
+      return;
+    }
     if (scope === "everyone") {
       this.chatLog.push(chat);
       if (this.chatLog.length > CHAT_HISTORY_LIMIT) this.chatLog.shift();
@@ -249,9 +264,44 @@ export class SpaceRoom extends Room<SpaceState> {
       }
       p.zoneId = zoneAt(this.map, p.x, p.y)?.id ?? "";
     }
+    // Theater playback for zones that no longer exist (or lost the kind)
+    // must not linger.
+    for (const zoneId of [...this.state.theaters.keys()]) {
+      const zone = this.map.zones.find((z) => z.id === zoneId);
+      if (!zone || zone.kind !== "theater") this.state.theaters.delete(zoneId);
+    }
     this.state.mapJson = JSON.stringify(this.map);
     this.state.mapVersion++;
     client.send(MSG.mapSaveResult, { ok: true });
+  }
+
+  /** Anyone inside a theater zone can drive its shared screen. */
+  private handleTheater(client: Client, msg: TheaterMessage) {
+    const p = this.state.players.get(client.sessionId);
+    if (!p || !p.zoneId) return;
+    const zone = this.map.zones.find((z) => z.id === p.zoneId);
+    if (!zone || zone.kind !== "theater") return;
+
+    if (msg.action === "set") {
+      const videoId = String(msg.videoId ?? "");
+      if (!/^[a-zA-Z0-9_-]{5,15}$/.test(videoId)) return;
+      const t = new TheaterState();
+      t.videoId = videoId;
+      t.playing = true;
+      t.timeMs = 0;
+      t.updatedAt = Date.now();
+      this.state.theaters.set(p.zoneId, t);
+      return;
+    }
+    const t = this.state.theaters.get(p.zoneId);
+    if (!t) return;
+    if (msg.action === "stop") {
+      this.state.theaters.delete(p.zoneId);
+      return;
+    }
+    t.playing = msg.action === "play";
+    t.timeMs = Math.max(0, Number(msg.timeMs) || 0);
+    t.updatedAt = Date.now();
   }
 
   private proximityTick() {

@@ -29,6 +29,8 @@ export interface ZoneRect {
   w: number;
   h: number;
   color: string;
+  /** "theater" zones get a shared synchronized video screen. */
+  kind?: "theater";
 }
 
 export interface Spawn {
@@ -138,7 +140,8 @@ export function validateMap(map: unknown): map is MapDoc {
         Number.isInteger(z.w) &&
         Number.isInteger(z.h) &&
         z.w > 0 &&
-        z.h > 0
+        z.h > 0 &&
+        (z.kind === undefined || z.kind === "theater")
     )
   )
     return false;

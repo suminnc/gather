@@ -215,7 +215,8 @@ furnitureTile(23, (ox, oy) => {
 });
 
 mkdirSync(path.join(ASSETS, "tiles"), { recursive: true });
-tiles.save(path.join(ASSETS, "tiles", "tiles.png"));
+// tiles.png is now curated from Kenney CC0 packs via build-tileset.mjs;
+// the generated placeholder sheet is no longer written.
 
 // ---------- avatars: 3 frames x 4 directions (down,left,right,up), 32px ----------
 const AVATAR_COLORS = [
@@ -277,52 +278,89 @@ AVATAR_COLORS.forEach((shirtHex, idx) => {
   c.save(path.join(ASSETS, "avatars", `avatar_${idx}.png`));
 });
 
-// ---------- default map: 40x30 office/park ----------
+// ---------- default map: 40x30 park + rooms + movie theater ----------
+// Palette (kenney tiles): floors 0 wood, 1 gray, 2 beige, 3 grass, 4 terracotta,
+// 5 teal, 6 dark wood, 7 dark gray. Walls 8 beige, 9 gray, 10 blue, 11 brown
+// brick, 12 beige stone, 13 stone block, 14 gray brick, 15 beige brick.
+// Objects: 16 chairD, 17 chairU, 18 armchair, 19 white chair, 20 table,
+// 21 bookshelf, 22 piano, 23-25 screen L/M/R, 26 speaker, 27 plant,
+// 28 door, 29 tree, 30 pine, 31 bush.
 const W = 40, H = 30;
-const floor = new Array(W * H).fill(2); // grass
+const floor = new Array(W * H).fill(3); // grass
 const walls = new Array(W * H).fill(-1);
 const at = (x, y) => y * W + x;
 
 // outer walls
 for (let x = 0; x < W; x++) {
-  walls[at(x, 0)] = 9;
-  walls[at(x, H - 1)] = 9;
+  walls[at(x, 0)] = 14;
+  walls[at(x, H - 1)] = 14;
 }
 for (let y = 0; y < H; y++) {
-  walls[at(0, y)] = 9;
-  walls[at(W - 1, y)] = 9;
+  walls[at(0, y)] = 14;
+  walls[at(W - 1, y)] = 14;
 }
 // stone plaza in the middle
-for (let y = 10; y < 20; y++) for (let x = 14; x < 27; x++) floor[at(x, y)] = 3;
+for (let y = 10; y < 19; y++) for (let x = 14; x < 27; x++) floor[at(x, y)] = 1;
 // wood-floored meeting room, top-left (zone z1)
 for (let y = 3; y < 10; y++) for (let x = 3; x < 13; x++) floor[at(x, y)] = 0;
 for (let x = 2; x <= 13; x++) { walls[at(x, 2)] = 8; walls[at(x, 10)] = 8; }
 for (let y = 2; y <= 10; y++) { walls[at(2, y)] = 8; walls[at(13, y)] = 8; }
-walls[at(8, 10)] = -1; // door
+walls[at(8, 10)] = -1; // door gap
 walls[at(9, 10)] = -1;
 // lounge room, top-right (zone z2)
-for (let y = 3; y < 10; y++) for (let x = 28; x < 38; x++) floor[at(x, y)] = 4;
+for (let y = 3; y < 10; y++) for (let x = 28; x < 38; x++) floor[at(x, y)] = 2;
 for (let x = 27; x <= 38; x++) { walls[at(x, 2)] = 10; walls[at(x, 10)] = 10; }
-for (let y = 2; y <= 10; y++) { walls[at(27, y)] = 10; if (at(38, y) < W * H) walls[at(38, y)] = 10; }
-walls[at(32, 10)] = -1; // door
+for (let y = 2; y <= 10; y++) { walls[at(27, y)] = 10; walls[at(38, y)] = 10; }
+walls[at(32, 10)] = -1; // door gap
 walls[at(33, 10)] = -1;
-// path from plaza to rooms
-for (let y = 10; y < 12; y++) for (let x = 8; x < 10; x++) floor[at(x, y)] = 7;
-for (let y = 10; y < 12; y++) for (let x = 32; x < 34; x++) floor[at(x, y)] = 7;
+// movie theater, bottom-left (zone theater): dark floor, brick shell
+for (let y = 20; y < 28; y++) for (let x = 3; x < 16; x++) floor[at(x, y)] = 7;
+for (let x = 2; x <= 16; x++) { walls[at(x, 19)] = 11; walls[at(x, 28)] = 11; }
+for (let y = 19; y <= 28; y++) { walls[at(2, y)] = 11; walls[at(16, y)] = 11; }
+walls[at(16, 23)] = -1; // entrance on the right wall
+walls[at(16, 24)] = -1;
+// terracotta aisle from plaza to the theater entrance
+for (let y = 23; y <= 24; y++) for (let x = 17; x < 20; x++) floor[at(x, y)] = 4;
 
 const objects = [
-  { id: "o1", gid: 17, x: 7, y: 6 },   // meeting table
-  { id: "o2", gid: 18, x: 5, y: 6 },
-  { id: "o3", gid: 18, x: 9, y: 6 },
-  { id: "o4", gid: 23, x: 4, y: 3 },   // whiteboard
-  { id: "o5", gid: 19, x: 30, y: 5 },  // sofa
-  { id: "o6", gid: 19, x: 34, y: 5 },
-  { id: "o7", gid: 22, x: 32, y: 6 },  // rug
-  { id: "o8", gid: 21, x: 36, y: 3 },  // bookshelf
-  { id: "o9", gid: 20, x: 15, y: 11 }, // plants around plaza
-  { id: "o10", gid: 20, x: 25, y: 11 },
-  { id: "o11", gid: 20, x: 15, y: 18 },
-  { id: "o12", gid: 20, x: 25, y: 18 },
+  // meeting room
+  { id: "o1", gid: 20, x: 7, y: 6 },
+  { id: "o2", gid: 16, x: 6, y: 5 },
+  { id: "o3", gid: 16, x: 8, y: 5 },
+  { id: "o4", gid: 17, x: 6, y: 7 },
+  { id: "o5", gid: 17, x: 8, y: 7 },
+  { id: "o6", gid: 21, x: 4, y: 3 },
+  // lounge
+  { id: "o7", gid: 18, x: 30, y: 5 },
+  { id: "o8", gid: 18, x: 34, y: 5 },
+  { id: "o9", gid: 22, x: 36, y: 3 },
+  { id: "o10", gid: 27, x: 29, y: 3 },
+  { id: "o11", gid: 20, x: 32, y: 6 },
+  // theater: screen strip on the front wall, then rows of seats
+  { id: "t1", gid: 23, x: 7, y: 20 },
+  { id: "t2", gid: 24, x: 8, y: 20 },
+  { id: "t3", gid: 24, x: 9, y: 20 },
+  { id: "t4", gid: 24, x: 10, y: 20 },
+  { id: "t5", gid: 25, x: 11, y: 20 },
+  { id: "t6", gid: 26, x: 4, y: 20 },
+  { id: "t7", gid: 26, x: 14, y: 20 },
+  ...[23, 25, 27].flatMap((row, r) =>
+    [4, 5, 6, 8, 10, 12, 13, 14].map((x, i) => ({
+      id: `s${r}_${i}`,
+      gid: 17,
+      x,
+      y: row,
+    }))
+  ),
+  // park
+  { id: "o12", gid: 29, x: 15, y: 11 },
+  { id: "o13", gid: 30, x: 25, y: 11 },
+  { id: "o14", gid: 30, x: 15, y: 17 },
+  { id: "o15", gid: 29, x: 25, y: 17 },
+  { id: "o16", gid: 31, x: 30, y: 20 },
+  { id: "o17", gid: 29, x: 33, y: 22 },
+  { id: "o18", gid: 30, x: 36, y: 25 },
+  { id: "o19", gid: 31, x: 30, y: 26 },
 ];
 
 const map = {
@@ -337,6 +375,7 @@ const map = {
   zones: [
     { id: "z1", name: "Meeting Room", x: 3, y: 3, w: 10, h: 7, color: "#7c3aed" },
     { id: "z2", name: "Lounge", x: 28, y: 3, w: 10, h: 7, color: "#2f855a" },
+    { id: "theater", name: "Theater", kind: "theater", x: 3, y: 20, w: 13, h: 8, color: "#b5544e" },
   ],
   spawns: [
     { x: 19, y: 14 },

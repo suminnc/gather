@@ -125,8 +125,11 @@ export class SpaceScene extends Phaser.Scene {
       }
     }
 
+    // enableCapture=false: capturing preventDefaults these keys globally,
+    // which silently ate W/A/S/D (and arrow cursoring) in the chat input.
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT"
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT",
+      false
     ) as Record<string, Phaser.Input.Keyboard.Key>;
     if (import.meta.env.DEV) (window as any).__scene = this;
 

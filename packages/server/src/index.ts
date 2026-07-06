@@ -5,6 +5,11 @@ import express from "express";
 import cors from "cors";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
+import { Encoder } from "@colyseus/schema";
+
+// mapJson (large maps + custom tile data URLs) blows through the encoder's
+// 8 KB default; size it to the ws transport's maxPayload.
+Encoder.BUFFER_SIZE = 1024 * 1024;
 import { MAX_CLIENTS } from "@gather/shared";
 import { SpaceRoom } from "./rooms/SpaceRoom";
 import {

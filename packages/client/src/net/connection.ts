@@ -13,8 +13,10 @@ import {
 import {
   pushChat,
   removePlayer,
+  removeTheater,
   setChatHistory,
   setMap,
+  setTheater,
   showEditorToast,
   updatePlayer,
   useStore,
@@ -103,6 +105,12 @@ export async function connect(
   });
   room = r;
 
+  if (import.meta.env.DEV) {
+    (window as any).__room = r;
+    (window as any).__sendTheater = sendTheater;
+    (window as any).__sendMove = sendMove;
+  }
+
   const manager = new PeerManager(r.sessionId, {
     rtc: (to, data) => r.send(MSG.rtc, { to, data }),
     mediaState: (micOn, camOn) => r.send(MSG.mediaState, { micOn, camOn }),
@@ -137,6 +145,21 @@ export async function connect(
   $(state).players.onRemove((_p: any, id: string) => {
     removePlayer(id);
     manager.onPeerLeft(id);
+  });
+
+  $(state).theaters.onAdd((t: any, zoneId: string) => {
+    const sync = () =>
+      setTheater(zoneId, {
+        videoId: t.videoId,
+        playing: t.playing,
+        timeMs: t.timeMs,
+        updatedAt: t.updatedAt,
+      });
+    $(t).onChange(sync);
+    sync();
+  });
+  $(state).theaters.onRemove((_t: any, zoneId: string) => {
+    removeTheater(zoneId);
   });
 
   // mapJson only changes on join/save; the decoded string keeps its identity
@@ -214,10 +237,18 @@ export function sendMove(
   room?.send(MSG.move, { x, y, dir, moving });
 }
 
-export function sendChat(scope: ChatScope, text: string): void {
-  room?.send(MSG.chatSend, { scope, text });
+export function sendChat(scope: ChatScope, text: string, to?: string): void {
+  room?.send(MSG.chatSend, { scope, text, to });
 }
 
 export function sendMapSave(map: MapDoc): void {
   room?.send(MSG.mapSave, { map });
+}
+
+export function sendTheater(
+  action: "set" | "play" | "pause" | "stop",
+  videoId?: string,
+  timeMs?: number
+): void {
+  room?.send(MSG.theater, { action, videoId, timeMs });
 }

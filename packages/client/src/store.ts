@@ -20,6 +20,14 @@ export interface PeerMedia {
   screenStream: MediaStream | null;
 }
 
+export interface TheaterInfo {
+  videoId: string;
+  playing: boolean;
+  timeMs: number;
+  /** Server wall-clock when timeMs was captured. */
+  updatedAt: number;
+}
+
 export type EditorTool =
   | "floor"
   | "wall"
@@ -79,6 +87,8 @@ interface GatherStore {
   screenStream: MediaStream | null;
   /** Remote media for currently linked call peers. */
   peers: Map<string, PeerMedia>;
+  /** zoneId -> shared playback for theater zones. */
+  theaters: Map<string, TheaterInfo>;
   editor: EditorState;
 }
 
@@ -115,6 +125,7 @@ export const useStore = create<GatherStore>()(
       localStream: null,
       screenStream: null,
       peers: new Map(),
+      theaters: new Map(),
       editor: initialEditor,
     })
   )
@@ -146,6 +157,18 @@ export function pushChat(msg: ChatMessage): void {
 
 export function setChatHistory(msgs: ChatMessage[]): void {
   useStore.setState({ chat: msgs.slice(-CHAT_CLIENT_LIMIT) });
+}
+
+export function setTheater(zoneId: string, info: TheaterInfo): void {
+  useStore.setState((s) => ({ theaters: new Map(s.theaters).set(zoneId, info) }));
+}
+
+export function removeTheater(zoneId: string): void {
+  useStore.setState((s) => {
+    const theaters = new Map(s.theaters);
+    theaters.delete(zoneId);
+    return { theaters };
+  });
 }
 
 export function setPeerMedia(id: string, media: PeerMedia): void {

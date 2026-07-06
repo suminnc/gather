@@ -14,10 +14,22 @@ export class Player extends Schema {
   @type("boolean") sharing = false;
 }
 
+/** Synchronized watch-together playback for one theater zone. */
+export class TheaterState extends Schema {
+  @type("string") videoId = "";
+  @type("boolean") playing = false;
+  /** Playback position at `updatedAt`. */
+  @type("number") timeMs = 0;
+  /** Server wall-clock when timeMs was captured. */
+  @type("number") updatedAt = 0;
+}
+
 export class SpaceState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>();
   /** Serialized MapDoc; only changes on explicit editor save. */
   @type("string") mapJson = "";
   /** Bumped on save so clients know to rebuild the tilemap. */
   @type("number") mapVersion = 0;
+  /** zoneId -> playback state, for zones with kind "theater". */
+  @type({ map: TheaterState }) theaters = new MapSchema<TheaterState>();
 }

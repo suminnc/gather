@@ -14,7 +14,9 @@ import { TileDesigner } from "./TileDesigner";
 
 const FLOOR_GIDS = [0, 1, 2, 3, 4, 5, 6, 7];
 const WALL_GIDS = [8, 9, 10, 11, 12, 13, 14, 15];
-const OBJECT_GIDS = [16, 17, 18, 19, 20, 21, 22, 23];
+const OBJECT_GIDS = [
+  16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+];
 
 function TileSwatch({
   gid,
@@ -128,6 +130,7 @@ function PendingZoneForm() {
   const pending = useStore((s) => s.editor.pendingZone);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#7c3aed");
+  const [theater, setTheater] = useState(false);
   if (!pending) return null;
 
   const confirm = () => {
@@ -137,11 +140,13 @@ function PendingZoneForm() {
       id: `z${Math.random().toString(36).slice(2, 8)}`,
       name: name.trim().slice(0, 32),
       color,
+      ...(theater ? { kind: "theater" as const } : {}),
       ...pending,
     });
     patchEditor({ pendingZone: null });
     bumpDraft();
     setName("");
+    setTheater(false);
   };
 
   return (
@@ -160,6 +165,14 @@ function PendingZoneForm() {
           if (e.key === "Enter") confirm();
         }}
       />
+      <label className="zone-theater-toggle">
+        <input
+          type="checkbox"
+          checked={theater}
+          onChange={(e) => setTheater(e.target.checked)}
+        />
+        🎬 Movie theater (shared video screen)
+      </label>
       <div className="zone-form-row">
         <input
           type="color"
@@ -252,7 +265,10 @@ export function EditorPanel() {
           {draft.zones.map((z) => (
             <div key={z.id} className="zone-row">
               <span className="zone-color" style={{ background: z.color }} />
-              <span className="zone-name">{z.name}</span>
+              <span className="zone-name">
+                {z.kind === "theater" ? "🎬 " : ""}
+                {z.name}
+              </span>
               <button onClick={() => deleteZone(z.id)}>✕</button>
             </div>
           ))}

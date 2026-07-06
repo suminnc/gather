@@ -15,11 +15,13 @@ export interface MediaStateMessage {
   camOn: boolean;
 }
 
-export type ChatScope = "nearby" | "everyone";
+export type ChatScope = "nearby" | "everyone" | "dm";
 
 export interface ChatSendMessage {
   scope: ChatScope;
   text: string;
+  /** DM target sessionId (required when scope is "dm"). */
+  to?: string;
 }
 
 /**
@@ -45,6 +47,15 @@ export interface MapSaveMessage {
   map: MapDoc;
 }
 
+/** Watch-together control, applied to the sender's current theater zone. */
+export interface TheaterMessage {
+  action: "set" | "play" | "pause" | "stop";
+  /** YouTube video id (for "set"). */
+  videoId?: string;
+  /** Playback position for play/pause. */
+  timeMs?: number;
+}
+
 /** server -> client */
 export interface ProximityMessage {
   added: string[];
@@ -63,6 +74,9 @@ export interface ChatMessage {
   scope: ChatScope;
   text: string;
   ts: number;
+  /** DM recipient (sessionId), present when scope is "dm". */
+  to?: string;
+  toName?: string;
 }
 
 export interface ScreenAnnounceRelay {
@@ -83,6 +97,7 @@ export const MSG = {
   screenAnnounce: "screen:announce",
   screenStop: "screen:stop",
   mapSave: "map:save",
+  theater: "theater",
   // server -> client
   proximity: "proximity",
   rtcRelay: "rtc:relay",

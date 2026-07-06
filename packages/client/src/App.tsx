@@ -21,6 +21,7 @@ import { ChatPanel } from "./ui/ChatPanel";
 import { VideoDock } from "./ui/VideoDock";
 import { MediaControls } from "./ui/MediaControls";
 import { TouchControls } from "./ui/TouchControls";
+import { TheaterOverlay } from "./ui/TheaterOverlay";
 import { EditorPanel } from "./editor/EditorPanel";
 
 const slugify = (s: string) =>
@@ -352,6 +353,7 @@ function SpaceView() {
   return (
     <div className="space-view">
       <GameCanvas />
+      {!editing && <TheaterOverlay />}
       <Hud />
       <VideoDock />
       <ChatPanel />
