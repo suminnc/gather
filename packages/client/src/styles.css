@@ -617,3 +617,125 @@ input:focus {
   cursor: pointer;
   font-size: 12px;
 }
+
+/* Floating (movable/resizable) panels */
+.floating-panel {
+  position: fixed !important;
+  right: auto !important;
+  bottom: auto !important;
+  min-width: 220px;
+  min-height: 42px;
+  z-index: 30;
+}
+.fp-resizable {
+  overflow: hidden;
+}
+.fp-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 55%,
+    #4a5060 55%,
+    #4a5060 65%,
+    transparent 65%,
+    transparent 75%,
+    #4a5060 75%,
+    #4a5060 85%,
+    transparent 85%
+  );
+  border-bottom-right-radius: 10px;
+  touch-action: none;
+  z-index: 5;
+}
+.editor-panel.fp-resizable {
+  overflow-y: auto;
+}
+.fp-drag {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.fp-drag:active {
+  cursor: grabbing;
+}
+
+/* Palette swatches: exact 32px tile inside the bordered button */
+.swatch {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swatch-img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.swatch-delete {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  font-size: 9px;
+  text-align: center;
+  border-radius: 50%;
+  background: #b5544e;
+  color: #fff;
+  display: none;
+  cursor: pointer;
+}
+.swatch:hover .swatch-delete {
+  display: block;
+}
+.swatch-row {
+  max-height: 88px;
+  overflow-y: auto;
+}
+
+/* Tile designer */
+.tile-designer {
+  background: rgba(29, 32, 39, 0.96);
+  border: 1px solid #2a2e38;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 296px;
+}
+.designer-canvas {
+  width: 256px;
+  height: 256px;
+  align-self: center;
+  background:
+    repeating-conic-gradient(#20242c 0% 25%, #262b34 0% 50%) 0 0 / 16px 16px;
+  border: 1px solid #2a2e38;
+  border-radius: 6px;
+  cursor: crosshair;
+  touch-action: none;
+}
+.designer-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.designer-row select {
+  flex: 1;
+  background: #20242c;
+  color: #e6e8ee;
+  border: 1px solid #2a2e38;
+  border-radius: 6px;
+  padding: 6px;
+}

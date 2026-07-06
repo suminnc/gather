@@ -14,6 +14,12 @@ export const MAX_CLIENTS = 10;
 export const MAX_MAP_SIZE = 100;
 export const CHAT_HISTORY_LIMIT = 100;
 
+/** Custom tile gids start here so they never collide with sheet frames. */
+export const CUSTOM_GID_BASE = 1000;
+export const MAX_CUSTOM_TILES = 64;
+/** Byte cap per custom-tile PNG data URL (a 32×32 PNG is usually <2 KB). */
+export const MAX_CUSTOM_TILE_DATA = 8192;
+
 /** Nearby chat reaches players in the same zone or within this tile distance. */
 export const NEARBY_CHAT_DIST = DISCONNECT_DIST;
 

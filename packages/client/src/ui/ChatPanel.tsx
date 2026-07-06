@@ -3,6 +3,7 @@ import type { ChatScope } from "@gather/shared";
 import { sendChat } from "../net/connection";
 import { useStore } from "../store";
 import { IS_TOUCH_DEVICE } from "./TouchControls";
+import { FloatingPanel } from "./FloatingPanel";
 
 export function ChatPanel() {
   const chat = useStore((s) => s.chat);
@@ -34,8 +35,12 @@ export function ChatPanel() {
   }
 
   return (
-    <div className="chat-panel">
-      <div className="chat-header">
+    <FloatingPanel
+      id="chat"
+      className="chat-panel"
+      defaultRect={{ x: 12, y: -12, w: 300, h: 320 }}
+    >
+      <div className="chat-header fp-drag">
         <span>Chat</span>
         <button onClick={() => setOpen(false)}>—</button>
       </div>
@@ -73,6 +78,6 @@ export function ChatPanel() {
           }}
         />
       </div>
-    </div>
+    </FloatingPanel>
   );
 }

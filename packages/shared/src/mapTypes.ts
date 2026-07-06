@@ -1,10 +1,24 @@
-import { MAX_MAP_SIZE } from "./constants";
+import {
+  CUSTOM_GID_BASE,
+  MAX_CUSTOM_TILES,
+  MAX_CUSTOM_TILE_DATA,
+  MAX_MAP_SIZE,
+} from "./constants";
 
 export interface MapObject {
   id: string;
   gid: number;
   x: number;
   y: number;
+}
+
+/** A user-drawn or imported tile design, synced as part of the map. */
+export interface CustomTile {
+  /** Stable id ≥ CUSTOM_GID_BASE so it never collides with sheet frames. */
+  gid: number;
+  kind: "floor" | "wall" | "object";
+  /** 32×32 PNG data URL. */
+  data: string;
 }
 
 export interface ZoneRect {
@@ -38,6 +52,7 @@ export interface MapDoc {
   objects: MapObject[];
   zones: ZoneRect[];
   spawns: Spawn[];
+  customTiles?: CustomTile[];
 }
 
 export function tileIndex(map: Pick<MapDoc, "width">, x: number, y: number): number {
@@ -94,6 +109,25 @@ export function validateMap(map: unknown): map is MapDoc {
     )
   )
     return false;
+  if (m.customTiles !== undefined) {
+    if (!Array.isArray(m.customTiles)) return false;
+    if (m.customTiles.length > MAX_CUSTOM_TILES) return false;
+    const gids = new Set<number>();
+    for (const c of m.customTiles) {
+      if (
+        !c ||
+        !Number.isInteger(c.gid) ||
+        c.gid < CUSTOM_GID_BASE ||
+        gids.has(c.gid) ||
+        (c.kind !== "floor" && c.kind !== "wall" && c.kind !== "object") ||
+        typeof c.data !== "string" ||
+        !c.data.startsWith("data:image/png;base64,") ||
+        c.data.length > MAX_CUSTOM_TILE_DATA
+      )
+        return false;
+      gids.add(c.gid);
+    }
+  }
   if (
     !m.zones.every(
       (z) =>

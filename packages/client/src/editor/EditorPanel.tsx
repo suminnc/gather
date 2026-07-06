@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { validateMap } from "@gather/shared";
+import { validateMap, type CustomTile } from "@gather/shared";
 import { sendMapSave } from "../net/connection";
 import {
   bumpDraft,
@@ -9,6 +9,8 @@ import {
   useStore,
   type EditorTool,
 } from "../store";
+import { FloatingPanel } from "../ui/FloatingPanel";
+import { TileDesigner } from "./TileDesigner";
 
 const FLOOR_GIDS = [0, 1, 2, 3, 4, 5, 6, 7];
 const WALL_GIDS = [8, 9, 10, 11, 12, 13, 14, 15];
@@ -16,22 +18,49 @@ const OBJECT_GIDS = [16, 17, 18, 19, 20, 21, 22, 23];
 
 function TileSwatch({
   gid,
+  custom,
   selected,
   onClick,
+  onDelete,
 }: {
   gid: number;
+  /** Data URL when this is a user design (rendered from the image). */
+  custom?: string;
   selected: boolean;
   onClick: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <button
       className={`swatch ${selected ? "selected" : ""}`}
       onClick={onClick}
-      style={{
-        backgroundImage: "url(/assets/tiles/tiles.png)",
-        backgroundPosition: `-${(gid % 8) * 32}px -${Math.floor(gid / 8) * 32}px`,
-      }}
-    />
+    >
+      {/* The tile renders in an inner 32×32 span so the button's border
+          doesn't crop the sprite or shift its background origin. */}
+      <span
+        className="swatch-img"
+        style={
+          custom
+            ? { backgroundImage: `url(${custom})` }
+            : {
+                backgroundImage: "url(/assets/tiles/tiles.png)",
+                backgroundPosition: `-${(gid % 8) * 32}px -${Math.floor(gid / 8) * 32}px`,
+              }
+        }
+      />
+      {onDelete && (
+        <span
+          className="swatch-delete"
+          title="Delete design"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          ✕
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -39,12 +68,23 @@ function SwatchRow({
   title,
   gids,
   tool,
+  kind,
 }: {
   title: string;
   gids: number[];
   tool: EditorTool;
+  kind: CustomTile["kind"];
 }) {
   const editor = useStore((s) => s.editor);
+  const customs = (editor.draft?.customTiles ?? []).filter(
+    (c) => c.kind === kind
+  );
+  const deleteCustom = (gid: number) => {
+    const { draft } = useStore.getState().editor;
+    if (!draft?.customTiles) return;
+    draft.customTiles = draft.customTiles.filter((c) => c.gid !== gid);
+    bumpDraft();
+  };
   return (
     <div className="editor-section">
       <div className="editor-section-title">{title}</div>
@@ -55,6 +95,16 @@ function SwatchRow({
             gid={gid}
             selected={editor.tool === tool && editor.gid === gid}
             onClick={() => patchEditor({ tool, gid })}
+          />
+        ))}
+        {customs.map((c) => (
+          <TileSwatch
+            key={c.gid}
+            gid={c.gid}
+            custom={c.data}
+            selected={editor.tool === tool && editor.gid === c.gid}
+            onClick={() => patchEditor({ tool, gid: c.gid })}
+            onDelete={() => deleteCustom(c.gid)}
           />
         ))}
       </div>
@@ -132,6 +182,7 @@ export function EditorPanel() {
   // mutates the draft in place.
   useStore((s) => s.editor.draftRev);
   const draft = useStore((s) => s.editor.draft);
+  const [designing, setDesigning] = useState(false);
   if (!draft) return null;
 
   const save = () => {
@@ -148,8 +199,12 @@ export function EditorPanel() {
   };
 
   return (
-    <div className="editor-panel">
-      <div className="editor-header">
+    <FloatingPanel
+      id="editor"
+      className="editor-panel"
+      defaultRect={{ x: -12, y: 60, w: 320 }}
+    >
+      <div className="editor-header fp-drag">
         <span>Map editor</span>
         <div>
           <button className="primary" onClick={save}>
@@ -159,9 +214,21 @@ export function EditorPanel() {
         </div>
       </div>
 
-      <SwatchRow title="Floor" gids={FLOOR_GIDS} tool="floor" />
-      <SwatchRow title="Walls" gids={WALL_GIDS} tool="wall" />
-      <SwatchRow title="Objects" gids={OBJECT_GIDS} tool="object" />
+      <SwatchRow title="Floor" gids={FLOOR_GIDS} tool="floor" kind="floor" />
+      <SwatchRow title="Walls" gids={WALL_GIDS} tool="wall" kind="wall" />
+      <SwatchRow
+        title="Objects"
+        gids={OBJECT_GIDS}
+        tool="object"
+        kind="object"
+      />
+
+      <div className="editor-section">
+        <button onClick={() => setDesigning(!designing)}>
+          {designing ? "Close tile designer" : "🎨 Design your own tile…"}
+        </button>
+      </div>
+      {designing && <TileDesigner onClose={() => setDesigning(false)} />}
 
       <div className="editor-section">
         <div className="editor-section-title">Tools</div>
@@ -191,6 +258,6 @@ export function EditorPanel() {
           ))}
         </div>
       )}
-    </div>
+    </FloatingPanel>
   );
 }

@@ -62,11 +62,24 @@ interface PlayerEntry {
   tween?: Phaser.Tweens.Tween;
 }
 
+/** Frame slots occupied by the base sheet (8×8 grid of 32px tiles). */
+const BASE_FRAMES = 64;
+const SHEET_COLS = 8;
+/** Live texture combining the base sheet with the map's custom tiles. */
+const TILES_KEY = "tiles-live";
+
 export class SpaceScene extends Phaser.Scene {
   private tilemap?: Phaser.Tilemaps.Tilemap;
   private floorLayer?: Phaser.Tilemaps.TilemapLayer;
   private wallsLayer?: Phaser.Tilemaps.TilemapLayer;
   private decor: Phaser.GameObjects.GameObject[] = [];
+  /** gid → frame index in the live texture, for custom tiles. */
+  private customFrames = new Map<number, number>();
+  /** Signature of the custom tiles baked into the live texture. */
+  private tilesSig: string | null = null;
+  private buildSeq = 0;
+  private worldW = 0;
+  private worldH = 0;
   private spawnMarkers: Phaser.GameObjects.GameObject[] = [];
   private entries = new Map<string, PlayerEntry>();
   private unsubs: Array<() => void> = [];
@@ -119,7 +132,7 @@ export class SpaceScene extends Phaser.Scene {
 
     const store = useStore.getState();
     this.myId = store.sessionId;
-    this.buildMap(store.map!);
+    void this.buildMap(store.map!);
     this.syncPlayers(store.players);
 
     const me = this.entries.get(this.myId);
@@ -137,8 +150,11 @@ export class SpaceScene extends Phaser.Scene {
         cam.setZoom(
           Phaser.Math.Clamp(cam.zoom * (dy > 0 ? 1 / 1.15 : 1.15), 1, 4)
         );
+        // Re-pad bounds so a fully zoomed-out view stays centered.
+        this.applyCameraBounds();
       }
     );
+    this.scale.on(Phaser.Scale.Events.RESIZE, () => this.applyCameraBounds());
 
     this.zonePreview = this.add.graphics().setDepth(10000);
 
@@ -237,10 +253,88 @@ export class SpaceScene extends Phaser.Scene {
 
   // ---------- map rendering ----------
 
-  private buildMap(doc: MapDoc): void {
+  private frameForGid(gid: number): number {
+    if (gid < BASE_FRAMES) return gid;
+    return this.customFrames.get(gid) ?? -1;
+  }
+
+  /**
+   * Rebuild the live texture: base sheet on top, the map's custom tiles
+   * appended below (frame = BASE_FRAMES + index). Data URLs decode
+   * asynchronously, so map builds await this.
+   */
+  private async prepareTiles(doc: MapDoc): Promise<void> {
+    const customs = doc.customTiles ?? [];
+    const sig = customs.map((c) => `${c.gid}:${c.data.length}`).join(",");
+    if (sig === this.tilesSig && this.textures.exists(TILES_KEY)) return;
+
+    const total = BASE_FRAMES + customs.length;
+    const rows = Math.ceil(total / SHEET_COLS);
+    const canvas = document.createElement("canvas");
+    canvas.width = SHEET_COLS * TILE_SIZE;
+    canvas.height = rows * TILE_SIZE;
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      this.textures.get("tiles").getSourceImage() as CanvasImageSource,
+      0,
+      0
+    );
+
+    const frames = new Map<number, number>();
+    await Promise.all(
+      customs.map(
+        (c, i) =>
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              const f = BASE_FRAMES + i;
+              ctx.drawImage(
+                img,
+                (f % SHEET_COLS) * TILE_SIZE,
+                Math.floor(f / SHEET_COLS) * TILE_SIZE,
+                TILE_SIZE,
+                TILE_SIZE
+              );
+              frames.set(c.gid, f);
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = c.data;
+          })
+      )
+    );
+
+    if (this.textures.exists(TILES_KEY)) this.textures.remove(TILES_KEY);
+    const tex = this.textures.addCanvas(TILES_KEY, canvas)!;
+    for (let f = 0; f < total; f++) {
+      tex.add(
+        f,
+        0,
+        (f % SHEET_COLS) * TILE_SIZE,
+        Math.floor(f / SHEET_COLS) * TILE_SIZE,
+        TILE_SIZE,
+        TILE_SIZE
+      );
+    }
+    this.customFrames = frames;
+    this.tilesSig = sig;
+  }
+
+  private async buildMap(doc: MapDoc): Promise<void> {
+    const seq = ++this.buildSeq;
+    // Destroy consumers of the live texture before it is replaced.
+    this.decor.forEach((o) => o.destroy());
+    this.decor = [];
     this.floorLayer?.destroy();
     this.wallsLayer?.destroy();
     this.tilemap?.destroy();
+    this.floorLayer = undefined;
+    this.wallsLayer = undefined;
+    this.tilemap = undefined;
+
+    await this.prepareTiles(doc);
+    if (seq !== this.buildSeq) return; // superseded by a newer build
 
     this.tilemap = this.make.tilemap({
       width: doc.width,
@@ -249,8 +343,8 @@ export class SpaceScene extends Phaser.Scene {
       tileHeight: TILE_SIZE,
     });
     const tileset = this.tilemap.addTilesetImage(
-      "tiles",
-      "tiles",
+      TILES_KEY,
+      TILES_KEY,
       TILE_SIZE,
       TILE_SIZE,
       0,
@@ -263,17 +357,30 @@ export class SpaceScene extends Phaser.Scene {
     this.fillLayers(doc);
     this.redrawDecor(doc);
 
-    const w = doc.width * TILE_SIZE;
-    const h = doc.height * TILE_SIZE;
-    this.cameras.main.setBounds(0, 0, w, h);
+    this.worldW = doc.width * TILE_SIZE;
+    this.worldH = doc.height * TILE_SIZE;
+    this.applyCameraBounds();
+  }
+
+  /**
+   * Camera bounds padded so that when the viewport outgrows the world
+   * (zoomed fully out or a small map), clamping centers the world on
+   * screen instead of pinning it to the top-left.
+   */
+  private applyCameraBounds(): void {
+    if (!this.worldW) return;
+    const cam = this.cameras.main;
+    const padX = Math.max(0, (cam.displayWidth - this.worldW) / 2);
+    const padY = Math.max(0, (cam.displayHeight - this.worldH) / 2);
+    cam.setBounds(-padX, -padY, this.worldW + padX * 2, this.worldH + padY * 2);
   }
 
   private fillLayers(doc: MapDoc): void {
     for (let y = 0; y < doc.height; y++) {
       for (let x = 0; x < doc.width; x++) {
         const i = tileIndex(doc, x, y);
-        const f = doc.layers.floor[i];
-        const w = doc.layers.walls[i];
+        const f = doc.layers.floor[i] >= 0 ? this.frameForGid(doc.layers.floor[i]) : -1;
+        const w = doc.layers.walls[i] >= 0 ? this.frameForGid(doc.layers.walls[i]) : -1;
         if (f >= 0) this.floorLayer!.putTileAt(f, x, y);
         else this.floorLayer!.removeTileAt(x, y);
         if (w >= 0) this.wallsLayer!.putTileAt(w, x, y);
@@ -287,9 +394,11 @@ export class SpaceScene extends Phaser.Scene {
     this.decor.forEach((o) => o.destroy());
     this.decor = [];
     for (const obj of doc.objects) {
+      const frame = this.frameForGid(obj.gid);
+      if (frame < 0) continue; // design was deleted
       this.decor.push(
         this.add
-          .image(px(obj.x), px(obj.y), "tiles", obj.gid)
+          .image(px(obj.x), px(obj.y), TILES_KEY, frame)
           .setDepth(px(obj.y))
       );
     }
@@ -322,7 +431,7 @@ export class SpaceScene extends Phaser.Scene {
   private onMapReplaced(): void {
     const { map, editor, players } = useStore.getState();
     if (!map || editor.active) return; // draft view stays until save/cancel
-    this.buildMap(map);
+    void this.buildMap(map);
     // The server may have respawned us out of a new wall.
     const me = players.get(this.myId);
     if (me && !this.hopping) this.snapLocal(me.x, me.y);
@@ -450,7 +559,7 @@ export class SpaceScene extends Phaser.Scene {
       this.spawnMarkers.forEach((m) => m.destroy());
       this.spawnMarkers = [];
       const map = useStore.getState().map;
-      if (map) this.buildMap(map); // discard painted draft tiles
+      if (map) void this.buildMap(map); // discard painted draft tiles
       const me = useStore.getState().players.get(this.myId);
       if (me) this.snapLocal(me.x, me.y);
       const entry = this.entries.get(this.myId);
@@ -462,6 +571,15 @@ export class SpaceScene extends Phaser.Scene {
   private redrawEditorOverlays(): void {
     const { editor } = useStore.getState();
     if (!editor.active || !editor.draft) return;
+    // A new/removed custom design means the live texture is stale; a full
+    // rebuild (from the draft, preserving painted tiles) re-bakes it.
+    const sig = (editor.draft.customTiles ?? [])
+      .map((c) => `${c.gid}:${c.data.length}`)
+      .join(",");
+    if (sig !== this.tilesSig) {
+      void this.buildMap(editor.draft);
+      return; // buildMap redraws decor; spawn markers redraw below next rev
+    }
     this.redrawDecor(editor.draft);
     this.spawnMarkers.forEach((m) => m.destroy());
     // Rings below the players so a spawn under someone's feet doesn't
@@ -577,16 +695,20 @@ export class SpaceScene extends Phaser.Scene {
     }
     const i = tileIndex(draft, tx, ty);
     switch (tool) {
-      case "floor":
+      case "floor": {
         if (draft.layers.floor[i] === gid) return false;
         draft.layers.floor[i] = gid;
-        this.floorLayer!.putTileAt(gid, tx, ty);
+        const f = this.frameForGid(gid);
+        if (f >= 0) this.floorLayer!.putTileAt(f, tx, ty);
         return true;
-      case "wall":
+      }
+      case "wall": {
         if (draft.layers.walls[i] === gid) return false;
         draft.layers.walls[i] = gid;
-        this.wallsLayer!.putTileAt(gid, tx, ty);
+        const f = this.frameForGid(gid);
+        if (f >= 0) this.wallsLayer!.putTileAt(f, tx, ty);
         return true;
+      }
       case "eraseWall":
         if (draft.layers.walls[i] === -1) return false;
         draft.layers.walls[i] = -1;
