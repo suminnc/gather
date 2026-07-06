@@ -63,6 +63,8 @@ interface GatherStore {
   spaceId: string;
   sessionId: string;
   connected: boolean;
+  /** Signed token for the Invite button's link; null in guest mode. */
+  inviteToken: string | null;
   map: MapDoc | null;
   /** Bumped whenever the live map is replaced (join + every editor save). */
   mapRev: number;
@@ -96,6 +98,7 @@ export const useStore = create<GatherStore>()(
       spaceId: "",
       sessionId: "",
       connected: false,
+      inviteToken: null,
       map: null,
       mapRev: 0,
       players: new Map(),

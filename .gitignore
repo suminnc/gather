@@ -11,3 +11,5 @@ packages/server/data/maps/*.json
 .vercel
 .env*
 .env.local
+packages/server/data/spaces.json
+packages/server/data/invite-secret

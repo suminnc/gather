@@ -1,6 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AVATARS } from "@gather/shared";
-import { connect, fetchSpaces, type SpaceListing } from "./net/connection";
+import {
+  connect,
+  fetchConfig,
+  fetchSpaces,
+  type ServerConfig,
+  type SpaceListing,
+} from "./net/connection";
+import {
+  getStoredAuth,
+  renderGoogleButton,
+  signOut,
+  storeAuth,
+  type AuthInfo,
+} from "./auth";
 import { useStore } from "./store";
 import { GameCanvas } from "./game/GameCanvas";
 import { Hud } from "./ui/Hud";
@@ -18,7 +31,15 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9_-]/g, "")
     .slice(0, 32);
 
-function JoinScreen({ spaceId, invited }: { spaceId: string; invited: boolean }) {
+function JoinScreen({
+  spaceId,
+  invited,
+  invite,
+}: {
+  spaceId: string;
+  invited: boolean;
+  invite: string | null;
+}) {
   const [name, setName] = useState(
     () => localStorage.getItem("gather:name") ?? ""
   );
@@ -32,56 +53,150 @@ function JoinScreen({ spaceId, invited }: { spaceId: string; invited: boolean })
   const [serverUp, setServerUp] = useState<boolean | null>(null);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // null while the server hasn't answered /api/config yet.
+  const [cfg, setCfg] = useState<ServerConfig | null>(null);
+  const [auth, setAuth] = useState<AuthInfo | null>(getStoredAuth);
+  const googleBtn = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const load = () =>
-      fetchSpaces()
+      fetchConfig()
+        .then((c) => alive && setCfg(c))
+        .catch(() => {
+          if (!alive) return;
+          setServerUp(false);
+          retry = setTimeout(load, 5000);
+        });
+    load();
+    return () => {
+      alive = false;
+      clearTimeout(retry);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cfg || (cfg.auth && !auth)) return;
+    let alive = true;
+    const load = () =>
+      fetchSpaces(auth?.idToken)
         .then((list) => {
           if (!alive) return;
           setSpaces(list);
           setServerUp(true);
         })
-        .catch(() => alive && setServerUp((up) => up && false));
+        .catch((err) => {
+          if (!alive) return;
+          if (err instanceof Error && err.message === "401") {
+            storeAuth(null);
+            setAuth(null);
+          } else {
+            setServerUp((up) => up && false);
+          }
+        });
     load();
     const timer = setInterval(load, 5000);
     return () => {
       alive = false;
       clearInterval(timer);
     };
-  }, []);
+  }, [cfg, auth]);
+
+  useEffect(() => {
+    if (!cfg?.auth || auth || !googleBtn.current) return;
+    void renderGoogleButton(cfg.googleClientId, googleBtn.current, setAuth);
+  }, [cfg, auth]);
+
+  // Default the display name to the Google profile name.
+  useEffect(() => {
+    if (auth && !name) setName(auth.name.slice(0, 24));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth]);
 
   const join = async () => {
     const trimmed = name.trim();
     const target = slugify(space) || "lobby";
     if (!trimmed || joining) return;
+    if (cfg?.auth && !auth) return;
     setJoining(true);
     setError(null);
     localStorage.setItem("gather:name", trimmed);
     localStorage.setItem("gather:avatar", avatar);
     history.replaceState(null, "", `/space/${target}`);
     try {
-      await connect(target, trimmed, avatar);
+      await connect(target, trimmed, avatar, {
+        idToken: auth?.idToken,
+        invite: invite ?? undefined,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to connect");
+      const msg = err instanceof Error ? err.message : "failed to connect";
+      if (msg.includes("not_invited")) {
+        setError(
+          "You haven't been invited to this workspace — ask a member for an invite link."
+        );
+      } else if (msg.includes("sign_in_required")) {
+        setError("Your sign-in expired — please sign in again.");
+        storeAuth(null);
+        setAuth(null);
+      } else {
+        setError(msg);
+      }
       setJoining(false);
     }
   };
 
   // A tab that got disconnected while backgrounded reloads itself with
   // ?rejoin=1 (see connection.ts); rejoin silently so the person stays
-  // present in the space they invited others to.
+  // present in the space they invited others to. Waits for /api/config so
+  // it knows whether a token is required.
+  const rejoinPending = useRef(
+    new URLSearchParams(location.search).has("rejoin")
+  );
   useEffect(() => {
-    if (!new URLSearchParams(location.search).has("rejoin")) return;
+    if (!rejoinPending.current || !cfg) return;
+    rejoinPending.current = false;
     history.replaceState(null, "", location.pathname);
-    if (name.trim()) void join();
+    if (name.trim() && (!cfg.auth || auth)) void join();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cfg]);
 
   return (
     <div className="join-screen">
       <div className="join-card">
         <h1>gather</h1>
+        {cfg === null ? (
+          <p className="ws-empty">
+            {serverUp === false
+              ? "Waking up the server — free hosting naps when idle. This can take up to a minute; hang tight."
+              : "Connecting to the server…"}
+          </p>
+        ) : cfg.auth && !auth ? (
+          <div className="auth-gate">
+            <p className="ws-empty">
+              {invited
+                ? `Sign in with Google to join ${spaceId}.`
+                : "Sign in with Google to continue."}
+            </p>
+            <div ref={googleBtn} className="google-btn" />
+          </div>
+        ) : (
+          <>
+        {cfg.auth && auth && (
+          <p className="auth-line">
+            {auth.email}
+            {" · "}
+            <button
+              className="linklike"
+              onClick={() => {
+                signOut();
+                setAuth(null);
+              }}
+            >
+              sign out
+            </button>
+          </p>
+        )}
         <input
           autoFocus
           placeholder="Your name"
@@ -132,7 +247,9 @@ function JoinScreen({ spaceId, invited }: { spaceId: string; invited: boolean })
             <p className="ws-empty">
               {invited
                 ? "Nobody's here yet — join below and you'll be the first one in."
-                : "Nobody is online yet — start a workspace below and invite people with its link."}
+                : cfg?.auth
+                  ? "No workspaces yet — create one below and share its invite link."
+                  : "Nobody is online yet — start a workspace below and invite people with its link."}
             </p>
           ) : (
             <p className="ws-empty">
@@ -169,6 +286,8 @@ function JoinScreen({ spaceId, invited }: { spaceId: string; invited: boolean })
                   : "Create"
               } ${slugify(space) || "lobby"}`}
         </button>
+          </>
+        )}
         {error && <p className="join-error">{error}</p>}
       </div>
     </div>
@@ -201,14 +320,16 @@ function SpaceView() {
 export default function App({
   spaceId,
   invited,
+  invite,
 }: {
   spaceId: string;
   invited: boolean;
+  invite: string | null;
 }) {
   const joined = useStore((s) => s.sessionId !== "");
   return joined ? (
     <SpaceView />
   ) : (
-    <JoinScreen spaceId={spaceId} invited={invited} />
+    <JoinScreen spaceId={spaceId} invited={invited} invite={invite} />
   );
 }

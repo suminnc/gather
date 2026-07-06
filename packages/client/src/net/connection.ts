@@ -39,8 +39,22 @@ export interface SpaceListing {
   maxClients: number;
 }
 
-export async function fetchSpaces(): Promise<SpaceListing[]> {
-  const res = await fetch(`${httpBase}/api/spaces`);
+export interface ServerConfig {
+  auth: boolean;
+  googleClientId: string;
+}
+
+export async function fetchConfig(): Promise<ServerConfig> {
+  const res = await fetch(`${httpBase}/api/config`);
+  if (!res.ok) throw new Error(`config failed: ${res.status}`);
+  return (await res.json()) as ServerConfig;
+}
+
+export async function fetchSpaces(idToken?: string): Promise<SpaceListing[]> {
+  const res = await fetch(`${httpBase}/api/spaces`, {
+    headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+  });
+  if (res.status === 401) throw new Error("401");
   if (!res.ok) throw new Error(`spaces listing failed: ${res.status}`);
   return (await res.json()) as SpaceListing[];
 }
@@ -69,11 +83,18 @@ function armAutoRejoin(): void {
 export async function connect(
   spaceId: string,
   name: string,
-  avatar: string
+  avatar: string,
+  auth?: { idToken?: string; invite?: string }
 ): Promise<void> {
   const endpoint = (httpBase || location.origin).replace(/^http/, "ws");
   const client = new Client(endpoint);
-  const r = await client.joinOrCreate("space", { spaceId, name, avatar });
+  const r = await client.joinOrCreate("space", {
+    spaceId,
+    name,
+    avatar,
+    idToken: auth?.idToken,
+    invite: auth?.invite,
+  });
   room = r;
 
   const manager = new PeerManager(r.sessionId, {
@@ -134,6 +155,9 @@ export async function connect(
   r.onMessage(MSG.screenStopRelay, (m: ScreenStopRelay) =>
     manager.onScreenStop(m.from)
   );
+  r.onMessage(MSG.inviteToken, (m: { token: string }) => {
+    useStore.setState({ inviteToken: m.token });
+  });
   r.onMessage(MSG.mapSaveResult, (m: { ok: boolean; error?: string }) => {
     if (m.ok) {
       showEditorToast("Map saved");

@@ -21,11 +21,22 @@ import {
 import { Player, SpaceState } from "./schema/SpaceState";
 import { computeLinkDiff } from "../logic/proximity";
 import { loadMap, saveMap } from "../maps/store";
+import { authEnabled, verifyIdToken, type AuthUser } from "../auth/google";
+import {
+  addMember,
+  createInvite,
+  ensureSpace,
+  getSpace,
+  isMember,
+  verifyInvite,
+} from "../auth/registry";
 
 interface JoinOptions {
   spaceId: string;
   name: string;
   avatar: string;
+  idToken?: string;
+  invite?: string;
 }
 
 export class SpaceRoom extends Room<SpaceState> {
@@ -88,6 +99,32 @@ export class SpaceRoom extends Room<SpaceState> {
     this.clock.setInterval(() => this.proximityTick(), PROXIMITY_TICK_MS);
   }
 
+  // Invite-only access: a valid Google identity is required, and the space
+  // must either be new (joiner becomes owner), already count the joiner as
+  // a member, or the join must carry a valid invite token — which enrolls
+  // the joiner as a member so plain links work for them afterward.
+  async onAuth(client: Client, options: JoinOptions) {
+    if (!authEnabled) return true;
+    if (!options.idToken) throw new Error("sign_in_required");
+    let user: AuthUser;
+    try {
+      user = await verifyIdToken(options.idToken);
+    } catch {
+      throw new Error("sign_in_required");
+    }
+    const space = getSpace(this.spaceId);
+    if (!space) {
+      ensureSpace(this.spaceId, user.email);
+      return user;
+    }
+    if (isMember(this.spaceId, user.email)) return user;
+    if (options.invite && verifyInvite(this.spaceId, options.invite)) {
+      addMember(this.spaceId, user.email);
+      return user;
+    }
+    throw new Error("not_invited");
+  }
+
   onJoin(client: Client, options: JoinOptions) {
     const p = new Player();
     p.name = String(options.name ?? "guest").slice(0, 24) || "guest";
@@ -100,6 +137,11 @@ export class SpaceRoom extends Room<SpaceState> {
     this.state.players.set(client.sessionId, p);
 
     client.send(MSG.chatHistory, this.chatLog);
+    // Any member can invite; the tokenized link is what the Invite button
+    // copies. Guest mode (auth disabled) falls back to the plain URL.
+    if (authEnabled) {
+      client.send(MSG.inviteToken, { token: createInvite(this.spaceId) });
+    }
     // Late joiner needs active screen shares to identify incoming tracks.
     for (const [id, other] of this.state.players) {
       if (id !== client.sessionId && other.sharing) {

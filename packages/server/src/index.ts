@@ -5,7 +5,10 @@ import express from "express";
 import cors from "cors";
 import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
+import { MAX_CLIENTS } from "@gather/shared";
 import { SpaceRoom } from "./rooms/SpaceRoom";
+import { authEnabled, googleClientId, verifyIdToken } from "./auth/google";
+import { spacesFor } from "./auth/registry";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(HERE, "../../client/dist");
@@ -16,15 +19,50 @@ const app = express();
 app.use(cors());
 app.get("/healthz", (_req, res) => res.send("ok"));
 
-// Active workspaces for the join screen.
-app.get("/api/spaces", async (_req, res) => {
+// Client bootstrap: whether sign-in is required and with which OAuth client.
+// Served from here so only the server env needs the Google client id.
+app.get("/api/config", (_req, res) => {
+  res.json({ auth: authEnabled, googleClientId });
+});
+
+// Workspaces for the join screen. With auth enabled this lists the caller's
+// memberships (registry) merged with live player counts; open mode keeps
+// the original list-all-active-rooms behavior.
+app.get("/api/spaces", async (req, res) => {
   const rooms = await matchMaker.query({ name: "space" });
+  const byId = new Map(
+    rooms.map((r) => [
+      (r.metadata as { spaceId?: string } | undefined)?.spaceId ?? "",
+      r,
+    ])
+  );
+  if (!authEnabled) {
+    res.json(
+      rooms.map((r) => ({
+        spaceId: (r.metadata as { spaceId?: string } | undefined)?.spaceId ?? "",
+        clients: r.clients,
+        maxClients: r.maxClients,
+      }))
+    );
+    return;
+  }
+  const token = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+  let email: string;
+  try {
+    email = (await verifyIdToken(token)).email;
+  } catch {
+    res.status(401).json({ error: "sign_in_required" });
+    return;
+  }
   res.json(
-    rooms.map((r) => ({
-      spaceId: (r.metadata as { spaceId?: string } | undefined)?.spaceId ?? "",
-      clients: r.clients,
-      maxClients: r.maxClients,
-    }))
+    spacesFor(email).map((spaceId) => {
+      const room = byId.get(spaceId);
+      return {
+        spaceId,
+        clients: room?.clients ?? 0,
+        maxClients: room?.maxClients ?? MAX_CLIENTS,
+      };
+    })
   );
 });
 

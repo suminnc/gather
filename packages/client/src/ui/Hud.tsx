@@ -4,6 +4,7 @@ import { enterEditor, exitEditor, useStore } from "../store";
 export function Hud() {
   const [copied, setCopied] = useState(false);
   const spaceId = useStore((s) => s.spaceId);
+  const inviteToken = useStore((s) => s.inviteToken);
   const connected = useStore((s) => s.connected);
   const editing = useStore((s) => s.editor.active);
   const zoneName = useStore((s) => {
@@ -20,7 +21,11 @@ export function Hud() {
       <button
         title="Copy an invite link to this workspace"
         onClick={() => {
-          const url = location.href;
+          // With auth enabled the link carries a signed invite token so the
+          // recipient is admitted (and remembered as a member) on join.
+          const url = inviteToken
+            ? `${location.origin}/space/${spaceId}?invite=${inviteToken}`
+            : location.href;
           const markCopied = () => {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);

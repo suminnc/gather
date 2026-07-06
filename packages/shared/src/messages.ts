@@ -91,4 +91,6 @@ export const MSG = {
   screenAnnounceRelay: "screen:announce:relay",
   screenStopRelay: "screen:stop:relay",
   mapSaveResult: "map:save:result",
+  /** Sent to each member on join so the Invite button can build a link. */
+  inviteToken: "invite:token",
 } as const;
