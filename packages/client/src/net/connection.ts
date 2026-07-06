@@ -46,6 +46,9 @@ export interface ServerConfig {
 
 export async function fetchConfig(): Promise<ServerConfig> {
   const res = await fetch(`${httpBase}/api/config`);
+  // Older servers don't expose /api/config: treat as open guest mode
+  // rather than blocking the join screen.
+  if (res.status === 404) return { auth: false, googleClientId: "" };
   if (!res.ok) throw new Error(`config failed: ${res.status}`);
   return (await res.json()) as ServerConfig;
 }
