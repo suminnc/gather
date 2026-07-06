@@ -105,7 +105,9 @@ function JoinScreen({
 
   useEffect(() => {
     if (!cfg?.auth || auth || !googleBtn.current) return;
-    void renderGoogleButton(cfg.googleClientId, googleBtn.current, setAuth);
+    const clientId =
+      cfg.googleClientIds?.[location.origin] ?? cfg.googleClientId;
+    void renderGoogleButton(clientId, googleBtn.current, setAuth);
   }, [cfg, auth]);
 
   // Default the display name to the Google profile name.

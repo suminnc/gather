@@ -42,6 +42,8 @@ export interface SpaceListing {
 export interface ServerConfig {
   auth: boolean;
   googleClientId: string;
+  /** Per-origin OAuth client ids when each frontend has its own. */
+  googleClientIds?: Record<string, string>;
 }
 
 export async function fetchConfig(): Promise<ServerConfig> {

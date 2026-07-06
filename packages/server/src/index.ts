@@ -7,7 +7,12 @@ import { Server, matchMaker } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { MAX_CLIENTS } from "@gather/shared";
 import { SpaceRoom } from "./rooms/SpaceRoom";
-import { authEnabled, googleClientId, verifyIdToken } from "./auth/google";
+import {
+  authEnabled,
+  googleClientId,
+  googleClientIdsByOrigin,
+  verifyIdToken,
+} from "./auth/google";
 import { spacesFor } from "./auth/registry";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -21,8 +26,15 @@ app.get("/healthz", (_req, res) => res.send("ok"));
 
 // Client bootstrap: whether sign-in is required and with which OAuth client.
 // Served from here so only the server env needs the Google client id.
-app.get("/api/config", (_req, res) => {
-  res.json({ auth: authEnabled, googleClientId });
+app.get("/api/config", (req, res) => {
+  // Same-origin GETs may omit the Origin header, so the per-origin map is
+  // included for the client to resolve against its own location.origin.
+  const origin = (req.headers.origin ?? "").replace(/\/+$/, "");
+  res.json({
+    auth: authEnabled,
+    googleClientId: googleClientIdsByOrigin[origin] ?? googleClientId,
+    googleClientIds: googleClientIdsByOrigin,
+  });
 });
 
 // Workspaces for the join screen. With auth enabled this lists the caller's
