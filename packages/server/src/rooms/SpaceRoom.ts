@@ -1,7 +1,10 @@
 import { Room, Client } from "colyseus";
 import { nanoid } from "nanoid";
 import {
+  CHAIR_GIDS,
   CHAT_HISTORY_LIMIT,
+  DOOR_GID,
+  KART_GID,
   MAX_CLIENTS,
   MSG,
   NEARBY_CHAT_DIST,
@@ -19,7 +22,7 @@ import {
   type ScreenAnnounceMessage,
   type TheaterMessage,
 } from "@gather/shared";
-import { Player, SpaceState, TheaterState } from "./schema/SpaceState";
+import { Kart, Player, SpaceState, TheaterState } from "./schema/SpaceState";
 import { computeLinkDiff } from "../logic/proximity";
 import { loadMap, saveMap } from "../maps/store";
 import { authEnabled, verifyIdToken, type AuthUser } from "../auth/google";
@@ -100,6 +103,15 @@ export class SpaceRoom extends Room<SpaceState> {
     this.onMessage(MSG.theater, (client, msg: TheaterMessage) =>
       this.handleTheater(client, msg)
     );
+    this.onMessage(MSG.doorToggle, (client, msg: { x: number; y: number }) =>
+      this.handleDoorToggle(client, msg)
+    );
+    this.onMessage(MSG.kartMount, (client, msg: { kartId: string }) =>
+      this.handleKartMount(client, msg)
+    );
+    this.onMessage(MSG.kartDismount, (client) => this.dismount(client.sessionId));
+
+    this.resetKarts();
 
     this.clock.setInterval(() => this.proximityTick(), PROXIMITY_TICK_MS);
   }
@@ -173,9 +185,80 @@ export class SpaceRoom extends Room<SpaceState> {
   }
 
   onLeave(client: Client) {
+    this.dismount(client.sessionId); // leave the kart behind, not in limbo
     this.state.players.delete(client.sessionId);
     this.screenStreams.delete(client.sessionId);
     // Next proximity tick emits the removed links to survivors.
+  }
+
+  // ---------- chairs / doors / karts ----------
+
+  private chairAt(x: number, y: number): boolean {
+    return this.map.objects.some(
+      (o) => CHAIR_GIDS.includes(o.gid) && o.x === x && o.y === y
+    );
+  }
+
+  private doorLockedAt(x: number, y: number): boolean {
+    return this.state.doors.get(`${x},${y}`) === true;
+  }
+
+  /**
+   * Members (or anyone in open mode) can lock/unlock an adjacent door
+   * object; guests can walk through unlocked doors but cannot operate
+   * the lock.
+   */
+  private handleDoorToggle(client: Client, msg: { x: number; y: number }) {
+    const p = this.state.players.get(client.sessionId);
+    if (!p) return;
+    const x = Math.trunc(msg.x);
+    const y = Math.trunc(msg.y);
+    if (Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) > 1) return;
+    const isDoor = this.map.objects.some(
+      (o) => o.gid === DOOR_GID && o.x === x && o.y === y
+    );
+    if (!isDoor) return;
+    const identity = (client as { auth?: { email?: string } | true }).auth;
+    const isGuest = typeof identity === "object" && !identity?.email;
+    if (isGuest) return;
+    const key = `${x},${y}`;
+    if (this.state.doors.get(key)) this.state.doors.delete(key);
+    else this.state.doors.set(key, true);
+  }
+
+  /** Rebuild runtime karts from the map's kart objects. */
+  private resetKarts() {
+    this.state.karts.clear();
+    for (const [, p] of this.state.players) p.riding = "";
+    for (const o of this.map.objects) {
+      if (o.gid !== KART_GID) continue;
+      const kart = new Kart();
+      kart.x = o.x;
+      kart.y = o.y;
+      this.state.karts.set(o.id, kart);
+    }
+  }
+
+  private handleKartMount(client: Client, msg: { kartId: string }) {
+    const p = this.state.players.get(client.sessionId);
+    const kart = this.state.karts.get(String(msg.kartId ?? ""));
+    if (!p || !kart || kart.rider || p.riding) return;
+    if (Math.max(Math.abs(p.x - kart.x), Math.abs(p.y - kart.y)) > 1) return;
+    kart.rider = client.sessionId;
+    p.riding = String(msg.kartId);
+    p.sitting = false;
+  }
+
+  private dismount(sessionId: string) {
+    const p = this.state.players.get(sessionId);
+    if (!p?.riding) return;
+    const kart = this.state.karts.get(p.riding);
+    if (kart) {
+      kart.rider = "";
+      kart.x = p.x;
+      kart.y = p.y;
+    }
+    p.riding = "";
   }
 
   private screenStreams = new Map<string, string>();
@@ -189,11 +272,20 @@ export class SpaceRoom extends Room<SpaceState> {
     // Teleport guard: client commits one tile at a time.
     if (Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) > 2) return;
     if (!isWalkable(this.map, x, y)) return;
+    if (this.doorLockedAt(x, y)) return;
     p.x = x;
     p.y = y;
     p.dir = msg.dir;
     p.moving = !!msg.moving;
     p.zoneId = zoneAt(this.map, x, y)?.id ?? "";
+    p.sitting = !p.riding && !msg.moving && this.chairAt(x, y);
+    if (p.riding) {
+      const kart = this.state.karts.get(p.riding);
+      if (kart) {
+        kart.x = x;
+        kart.y = y;
+      }
+    }
   }
 
   private handleChat(client: Client, msg: ChatSendMessage) {
@@ -269,6 +361,15 @@ export class SpaceRoom extends Room<SpaceState> {
     for (const zoneId of [...this.state.theaters.keys()]) {
       const zone = this.map.zones.find((z) => z.id === zoneId);
       if (!zone || zone.kind !== "theater") this.state.theaters.delete(zoneId);
+    }
+    // Kart fleet and door locks follow the edited object set.
+    this.resetKarts();
+    for (const key of [...this.state.doors.keys()]) {
+      const [dx, dy] = key.split(",").map(Number);
+      const stillDoor = this.map.objects.some(
+        (o) => o.gid === DOOR_GID && o.x === dx && o.y === dy
+      );
+      if (!stillDoor) this.state.doors.delete(key);
     }
     this.state.mapJson = JSON.stringify(this.map);
     this.state.mapVersion++;

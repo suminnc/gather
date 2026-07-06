@@ -12,8 +12,11 @@ import {
 } from "@gather/shared";
 import {
   pushChat,
+  removeKart,
   removePlayer,
   removeTheater,
+  setDoorLocked,
+  setKart,
   setChatHistory,
   setMap,
   setTheater,
@@ -138,6 +141,8 @@ export async function connect(
         micOn: p.micOn,
         camOn: p.camOn,
         sharing: p.sharing,
+        sitting: p.sitting,
+        riding: p.riding,
       });
     $(p).onChange(sync);
     sync();
@@ -161,6 +166,19 @@ export async function connect(
   $(state).theaters.onRemove((_t: any, zoneId: string) => {
     removeTheater(zoneId);
   });
+
+  $(state).karts.onAdd((k: any, id: string) => {
+    const sync = () => setKart(id, { x: k.x, y: k.y, rider: k.rider });
+    $(k).onChange(sync);
+    sync();
+  });
+  $(state).karts.onRemove((_k: any, id: string) => removeKart(id));
+  $(state).doors.onAdd((locked: boolean, key: string) =>
+    setDoorLocked(key, !!locked)
+  );
+  $(state).doors.onRemove((_v: boolean, key: string) =>
+    setDoorLocked(key, false)
+  );
 
   // mapJson only changes on join/save; the decoded string keeps its identity
   // between patches, so a reference check keeps this cheap.
@@ -243,6 +261,18 @@ export function sendChat(scope: ChatScope, text: string, to?: string): void {
 
 export function sendMapSave(map: MapDoc): void {
   room?.send(MSG.mapSave, { map });
+}
+
+export function sendDoorToggle(x: number, y: number): void {
+  room?.send(MSG.doorToggle, { x, y });
+}
+
+export function sendKartMount(kartId: string): void {
+  room?.send(MSG.kartMount, { kartId });
+}
+
+export function sendKartDismount(): void {
+  room?.send(MSG.kartDismount);
 }
 
 export function sendTheater(

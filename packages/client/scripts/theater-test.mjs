@@ -93,6 +93,62 @@ check(
   dm && dm.text === "secret" && dm.to === b.sessionId && dm.toName === "Bob"
 );
 
+// 10. Chairs: parking on a theater seat sits you; stepping off stands you.
+me = await walkTo(a, 4, 23); // seat tile (chair gid on default map)
+check(`sitting on a chair (${me.x},${me.y})`, me.sitting === true);
+me = await walkTo(a, 4, 22);
+check("standing after stepping off", me.sitting === false);
+
+// 11. Doors: locking blocks movement through the tile; unlocking restores it.
+a.send("door:toggle", { x: 16, y: 23 }); // adjacent? alice is at (4,22) - too far
+await sleep(200);
+check("far door toggle ignored", a.state.doors.size === 0);
+await walkTo(a, 15, 23);
+a.send("door:toggle", { x: 16, y: 23 });
+await sleep(200);
+check("adjacent door locks", a.state.doors.get("16,23") === true);
+// Bob (outside at 12,24... walk him to the locked door and try to pass)
+await walkTo(b, 17, 23);
+const before = { ...b.state.players.get(b.sessionId) };
+b.send("move", { x: 16, y: 23, dir: "left", moving: true });
+await sleep(200);
+const after = b.state.players.get(b.sessionId);
+check(
+  `locked door blocks (${after.x},${after.y})`,
+  after.x === before.x && after.y === before.y
+);
+a.send("door:toggle", { x: 16, y: 23 });
+await sleep(200);
+b.send("move", { x: 16, y: 23, dir: "left", moving: true });
+await sleep(200);
+check("unlocked door passes", b.state.players.get(b.sessionId).x === 16);
+
+// 12. Karts: mount, ride (kart follows), dismount where you stop.
+await walkTo(b, 17, 23);
+await walkTo(b, 22, 20); // next to kart k1 at (23,20)
+b.send("kart:mount", { kartId: "k1" });
+await sleep(200);
+let kart = b.state.karts.get("k1");
+check(
+  "kart mounts",
+  kart.rider === b.sessionId &&
+    b.state.players.get(b.sessionId).riding === "k1"
+);
+await walkTo(b, 22, 17);
+kart = b.state.karts.get("k1");
+check(`kart follows rider (${kart.x},${kart.y})`, kart.x === 22 && kart.y === 17);
+b.send("kart:dismount");
+await sleep(200);
+kart = b.state.karts.get("k1");
+check(
+  "dismount parks kart",
+  kart.rider === "" && kart.x === 22 && kart.y === 17 &&
+    b.state.players.get(b.sessionId).riding === ""
+);
+b.send("kart:mount", { kartId: "k2" });
+await sleep(200);
+check("distant kart mount rejected", b.state.karts.get("k2").rider === "");
+
 await a.leave();
 await b.leave();
 console.log(`\n${pass} passed, ${fail} failed`);

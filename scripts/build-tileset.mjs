@@ -88,5 +88,37 @@ PICKS.forEach(([sheet, sc, sr], gid) => {
   }
 });
 
+// gid 32: hand-drawn top-down go-kart (no vehicles in the Kenney packs).
+{
+  const gid = PICKS.length; // 32
+  const dx = (gid % COLS) * TILE;
+  const dy = Math.floor(gid / COLS) * TILE;
+  const put = (x, y, r, g, b) => {
+    const i = ((dy + y) * out.width + dx + x) * 4;
+    out.data[i] = r;
+    out.data[i + 1] = g;
+    out.data[i + 2] = b;
+    out.data[i + 3] = 255;
+  };
+  const rect = (x0, y0, x1, y1, c) => {
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, ...c);
+  };
+  const RED = [200, 50, 50];
+  const DARK = [30, 30, 34];
+  const GRAY = [90, 94, 104];
+  const YELLOW = [240, 200, 60];
+  rect(10, 6, 21, 25, RED); // chassis
+  rect(12, 4, 19, 6, YELLOW); // front wing
+  rect(13, 12, 18, 19, DARK); // seat
+  rect(14, 8, 17, 10, GRAY); // steering column
+  rect(6, 6, 9, 12, DARK); // wheels
+  rect(22, 6, 25, 12, DARK);
+  rect(6, 19, 9, 25, DARK);
+  rect(22, 19, 25, 25, DARK);
+  rect(12, 26, 19, 28, GRAY); // rear bumper
+}
+
 fs.writeFileSync(OUT, PNG.sync.write(out));
-console.log(`wrote ${OUT} (${out.width}x${out.height}, ${PICKS.length} tiles)`);
+console.log(
+  `wrote ${OUT} (${out.width}x${out.height}, ${PICKS.length + 1} tiles)`
+);

@@ -14,6 +14,13 @@ export const MAX_CLIENTS = 10;
 export const MAX_MAP_SIZE = 100;
 export const CHAT_HISTORY_LIMIT = 100;
 
+/** Object gids with special behavior (see the curated tileset layout). */
+export const CHAIR_GIDS = [16, 17, 18, 19];
+export const DOOR_GID = 28;
+export const KART_GID = 32;
+/** Riding a kart halves the per-tile hop duration. */
+export const KART_SPEED_FACTOR = 2;
+
 /** Custom tile gids start here so they never collide with sheet frames. */
 export const CUSTOM_GID_BASE = 1000;
 export const MAX_CUSTOM_TILES = 64;

@@ -12,6 +12,17 @@ export class Player extends Schema {
   @type("boolean") micOn = true;
   @type("boolean") camOn = true;
   @type("boolean") sharing = false;
+  /** True while standing on a chair object. */
+  @type("boolean") sitting = false;
+  /** Kart id while riding, "" otherwise. */
+  @type("string") riding = "";
+}
+
+/** A rideable go-kart; unridden karts sit at (x, y). */
+export class Kart extends Schema {
+  @type("number") x = 0;
+  @type("number") y = 0;
+  @type("string") rider = "";
 }
 
 /** Synchronized watch-together playback for one theater zone. */
@@ -32,4 +43,8 @@ export class SpaceState extends Schema {
   @type("number") mapVersion = 0;
   /** zoneId -> playback state, for zones with kind "theater". */
   @type({ map: TheaterState }) theaters = new MapSchema<TheaterState>();
+  /** kartId (map object id) -> kart. */
+  @type({ map: Kart }) karts = new MapSchema<Kart>();
+  /** "x,y" -> locked, for door objects. Runtime-only state. */
+  @type({ map: "boolean" }) doors = new MapSchema<boolean>();
 }

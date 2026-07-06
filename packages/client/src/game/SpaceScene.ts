@@ -1,6 +1,9 @@
 import Phaser from "phaser";
 import {
   AVATARS,
+  DOOR_GID,
+  KART_GID,
+  KART_SPEED_FACTOR,
   MOVE_MS,
   TILE_SIZE,
   isWalkable,
@@ -9,7 +12,12 @@ import {
   type MapDoc,
 } from "@gather/shared";
 import { bumpDraft, patchEditor, useStore, type PlayerInfo } from "../store";
-import { sendMove } from "../net/connection";
+import {
+  sendDoorToggle,
+  sendKartDismount,
+  sendKartMount,
+  sendMove,
+} from "../net/connection";
 
 const DIR_ROW: Record<Direction, number> = { down: 0, left: 1, right: 2, up: 3 };
 const DIR_DELTA: Record<Direction, [number, number]> = {
@@ -55,6 +63,8 @@ interface PlayerEntry {
   container: Phaser.GameObjects.Container;
   sprite: Phaser.GameObjects.Sprite;
   label: Phaser.GameObjects.Text;
+  /** Kart drawn under the avatar while riding. */
+  kart?: Phaser.GameObjects.Image;
   avatar: string;
   /** Tile position this entry is at or tweening toward. */
   x: number;
@@ -93,6 +103,10 @@ export class SpaceScene extends Phaser.Scene {
   private sentMoving = false;
   private sentDir: Direction = "down";
 
+  private kartSprites = new Map<string, Phaser.GameObjects.Image>();
+  /** Door decor images by "x,y", for lock tinting. */
+  private doorSprites = new Map<string, Phaser.GameObjects.Image>();
+
   private zoneDragStart: { x: number; y: number } | null = null;
   private zonePreview?: Phaser.GameObjects.Graphics;
   /** Last tile painted in the current drag, for stroke interpolation. */
@@ -128,7 +142,7 @@ export class SpaceScene extends Phaser.Scene {
     // enableCapture=false: capturing preventDefaults these keys globally,
     // which silently ate W/A/S/D (and arrow cursoring) in the chat input.
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,E",
       false
     ) as Record<string, Phaser.Input.Keyboard.Key>;
     if (import.meta.env.DEV) (window as any).__scene = this;
@@ -185,6 +199,14 @@ export class SpaceScene extends Phaser.Scene {
       useStore.subscribe(
         (s) => s.editor.draftRev,
         () => this.redrawEditorOverlays()
+      ),
+      useStore.subscribe(
+        (s) => s.karts,
+        (karts) => this.syncKarts(karts)
+      ),
+      useStore.subscribe(
+        (s) => s.lockedDoors,
+        (locked) => this.tintDoors(locked)
       )
     );
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -202,6 +224,15 @@ export class SpaceScene extends Phaser.Scene {
     }
     if (typingLock || this.hopping) return;
 
+    // E hops off a kart, leaving it on the current tile.
+    if (
+      Phaser.Input.Keyboard.JustDown(this.keys.E) &&
+      useStore.getState().players.get(this.myId)?.riding
+    ) {
+      sendKartDismount();
+      return;
+    }
+
     const dir = this.heldDirection();
     if (!dir) {
       if (this.sentMoving) {
@@ -218,7 +249,8 @@ export class SpaceScene extends Phaser.Scene {
     const nx = this.localX + dx;
     const ny = this.localY + dy;
 
-    if (!map || !isWalkable(map, nx, ny)) {
+    const doorLocked = useStore.getState().lockedDoors.has(`${nx},${ny}`);
+    if (!map || !isWalkable(map, nx, ny) || doorLocked) {
       // Blocked: just face that way (dist 0 keeps the server happy).
       this.setIdle(this.myId, dir);
       if (this.sentDir !== dir || this.sentMoving) {
@@ -236,6 +268,17 @@ export class SpaceScene extends Phaser.Scene {
     this.sentDir = dir;
     sendMove(nx, ny, dir, true);
 
+    // Stepping next to or onto a free kart mounts it.
+    const riding = useStore.getState().players.get(this.myId)?.riding;
+    if (!riding) {
+      for (const [kartId, kart] of useStore.getState().karts) {
+        if (!kart.rider && kart.x === nx && kart.y === ny) {
+          sendKartMount(kartId);
+          break;
+        }
+      }
+    }
+
     const entry = this.entries.get(this.myId);
     if (!entry) return;
     entry.x = nx;
@@ -246,7 +289,7 @@ export class SpaceScene extends Phaser.Scene {
       targets: entry.container,
       x: px(nx),
       y: px(ny),
-      duration: MOVE_MS,
+      duration: riding ? MOVE_MS / KART_SPEED_FACTOR : MOVE_MS,
       onUpdate: () => entry.container.setDepth(entry.container.y),
       onComplete: () => {
         this.hopping = false;
@@ -396,15 +439,20 @@ export class SpaceScene extends Phaser.Scene {
   private redrawDecor(doc: MapDoc): void {
     this.decor.forEach((o) => o.destroy());
     this.decor = [];
+    this.doorSprites.clear();
     for (const obj of doc.objects) {
       const frame = this.frameForGid(obj.gid);
       if (frame < 0) continue; // design was deleted
-      this.decor.push(
-        this.add
-          .image(px(obj.x), px(obj.y), TILES_KEY, frame)
-          .setDepth(px(obj.y))
-      );
+      if (obj.gid === KART_GID) continue; // karts render from live state
+      const img = this.add
+        .image(px(obj.x), px(obj.y), TILES_KEY, frame)
+        .setDepth(px(obj.y));
+      if (obj.gid === DOOR_GID) {
+        this.doorSprites.set(`${obj.x},${obj.y}`, img);
+      }
+      this.decor.push(img);
     }
+    this.tintDoors(useStore.getState().lockedDoors);
     for (const zone of doc.zones) {
       const color = Number.parseInt(zone.color.replace("#", ""), 16);
       this.decor.push(
@@ -471,6 +519,7 @@ export class SpaceScene extends Phaser.Scene {
       if (entry.label.text !== label) entry.label.setText(label);
 
       if (id === this.myId) {
+        this.applySeatAndKart(entry, info);
         // Local movement is client-driven; only correct on server respawn.
         const idle = !this.hopping && !this.heldDirection();
         if (idle && (info.x !== this.localX || info.y !== this.localY)) {
@@ -478,6 +527,8 @@ export class SpaceScene extends Phaser.Scene {
         }
         continue;
       }
+
+      this.applySeatAndKart(entry, info);
 
       if (info.x !== entry.x || info.y !== entry.y) {
         entry.x = info.x;
@@ -488,7 +539,7 @@ export class SpaceScene extends Phaser.Scene {
           targets: entry.container,
           x: px(info.x),
           y: px(info.y),
-          duration: MOVE_MS,
+          duration: info.riding ? MOVE_MS / KART_SPEED_FACTOR : MOVE_MS,
           onUpdate: () => entry.container.setDepth(entry.container.y),
           onComplete: () => {
             const latest = useStore.getState().players.get(id);
@@ -531,6 +582,51 @@ export class SpaceScene extends Phaser.Scene {
       .container(px(info.x), px(info.y), [sprite, label])
       .setDepth(px(info.y));
     return { container, sprite, label, avatar, x: info.x, y: info.y };
+  }
+
+  /** Chair squat + kart-under-avatar visuals, driven by server state. */
+  private applySeatAndKart(entry: PlayerEntry, info: PlayerInfo): void {
+    entry.sprite.y = info.sitting ? 6 : 0;
+    if (info.riding && !entry.kart) {
+      const frame = this.frameForGid(KART_GID);
+      entry.kart = this.add.image(0, 6, TILES_KEY, frame);
+      entry.container.addAt(entry.kart, 0);
+    } else if (!info.riding && entry.kart) {
+      entry.kart.destroy();
+      entry.kart = undefined;
+    }
+  }
+
+  /** Unridden karts sit on the map; ridden ones render under their rider. */
+  private syncKarts(karts: Map<string, { x: number; y: number; rider: string }>): void {
+    for (const [id, kart] of karts) {
+      let img = this.kartSprites.get(id);
+      if (kart.rider) {
+        img?.destroy();
+        this.kartSprites.delete(id);
+        continue;
+      }
+      if (!img) {
+        const frame = this.frameForGid(KART_GID);
+        img = this.add.image(px(kart.x), px(kart.y), TILES_KEY, frame);
+        this.kartSprites.set(id, img);
+      }
+      img.setPosition(px(kart.x), px(kart.y)).setDepth(px(kart.y) - 1);
+    }
+    for (const [id, img] of this.kartSprites) {
+      if (!karts.has(id)) {
+        img.destroy();
+        this.kartSprites.delete(id);
+      }
+    }
+  }
+
+  private tintDoors(locked: Set<string>): void {
+    for (const [key, img] of this.doorSprites) {
+      const isLocked = locked.has(key);
+      img.setAlpha(isLocked ? 1 : 0.55);
+      img.setTint(isLocked ? 0xff8888 : 0xffffff);
+    }
   }
 
   private setIdle(id: string, dir: Direction): void {
@@ -608,7 +704,10 @@ export class SpaceScene extends Phaser.Scene {
 
   private onEditorPointer(pointer: Phaser.Input.Pointer, isDown: boolean): void {
     const { editor } = useStore.getState();
-    if (!editor.active || !editor.draft) return;
+    if (!editor.active || !editor.draft) {
+      if (isDown && !editor.active) this.onWorldClick(pointer);
+      return;
+    }
     const draft = editor.draft;
     const world = pointer.positionToCamera(
       this.cameras.main
@@ -684,6 +783,25 @@ export class SpaceScene extends Phaser.Scene {
         break;
       }
     }
+  }
+
+  /** Clicking an adjacent door toggles its lock. */
+  private onWorldClick(pointer: Phaser.Input.Pointer): void {
+    const map = useStore.getState().map;
+    if (!map) return;
+    const world = pointer.positionToCamera(
+      this.cameras.main
+    ) as Phaser.Math.Vector2;
+    const tx = Math.floor(world.x / TILE_SIZE);
+    const ty = Math.floor(world.y / TILE_SIZE);
+    const isDoor = map.objects.some(
+      (o) => o.gid === DOOR_GID && o.x === tx && o.y === ty
+    );
+    if (!isDoor) return;
+    if (Math.max(Math.abs(this.localX - tx), Math.abs(this.localY - ty)) > 1) {
+      return;
+    }
+    sendDoorToggle(tx, ty);
   }
 
   private paintTile(

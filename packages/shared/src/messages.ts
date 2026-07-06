@@ -47,6 +47,15 @@ export interface MapSaveMessage {
   map: MapDoc;
 }
 
+export interface DoorToggleMessage {
+  x: number;
+  y: number;
+}
+
+export interface KartMountMessage {
+  kartId: string;
+}
+
 /** Watch-together control, applied to the sender's current theater zone. */
 export interface TheaterMessage {
   action: "set" | "play" | "pause" | "stop";
@@ -98,6 +107,9 @@ export const MSG = {
   screenStop: "screen:stop",
   mapSave: "map:save",
   theater: "theater",
+  doorToggle: "door:toggle",
+  kartMount: "kart:mount",
+  kartDismount: "kart:dismount",
   // server -> client
   proximity: "proximity",
   rtcRelay: "rtc:relay",

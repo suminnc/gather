@@ -13,6 +13,15 @@ export interface PlayerInfo {
   micOn: boolean;
   camOn: boolean;
   sharing: boolean;
+  sitting: boolean;
+  /** Kart id while riding, "" otherwise. */
+  riding: string;
+}
+
+export interface KartInfo {
+  x: number;
+  y: number;
+  rider: string;
 }
 
 export interface PeerMedia {
@@ -89,6 +98,9 @@ interface GatherStore {
   peers: Map<string, PeerMedia>;
   /** zoneId -> shared playback for theater zones. */
   theaters: Map<string, TheaterInfo>;
+  karts: Map<string, KartInfo>;
+  /** "x,y" keys of locked door objects. */
+  lockedDoors: Set<string>;
   editor: EditorState;
 }
 
@@ -126,6 +138,8 @@ export const useStore = create<GatherStore>()(
       screenStream: null,
       peers: new Map(),
       theaters: new Map(),
+      karts: new Map(),
+      lockedDoors: new Set(),
       editor: initialEditor,
     })
   )
@@ -157,6 +171,27 @@ export function pushChat(msg: ChatMessage): void {
 
 export function setChatHistory(msgs: ChatMessage[]): void {
   useStore.setState({ chat: msgs.slice(-CHAT_CLIENT_LIMIT) });
+}
+
+export function setKart(id: string, info: KartInfo): void {
+  useStore.setState((s) => ({ karts: new Map(s.karts).set(id, info) }));
+}
+
+export function removeKart(id: string): void {
+  useStore.setState((s) => {
+    const karts = new Map(s.karts);
+    karts.delete(id);
+    return { karts };
+  });
+}
+
+export function setDoorLocked(key: string, locked: boolean): void {
+  useStore.setState((s) => {
+    const lockedDoors = new Set(s.lockedDoors);
+    if (locked) lockedDoors.add(key);
+    else lockedDoors.delete(key);
+    return { lockedDoors };
+  });
 }
 
 export function setTheater(zoneId: string, info: TheaterInfo): void {

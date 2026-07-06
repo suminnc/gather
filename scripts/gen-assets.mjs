@@ -352,6 +352,14 @@ const objects = [
       y: row,
     }))
   ),
+  // doors (lockable): meeting room + theater entrances
+  { id: "d1", gid: 28, x: 8, y: 10 },
+  { id: "d2", gid: 28, x: 9, y: 10 },
+  { id: "d3", gid: 28, x: 16, y: 23 },
+  { id: "d4", gid: 28, x: 16, y: 24 },
+  // go-karts parked south of the plaza
+  { id: "k1", gid: 32, x: 23, y: 20 },
+  { id: "k2", gid: 32, x: 25, y: 20 },
   // park
   { id: "o12", gid: 29, x: 15, y: 11 },
   { id: "o13", gid: 30, x: 25, y: 11 },
