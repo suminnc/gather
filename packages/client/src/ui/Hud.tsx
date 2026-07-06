@@ -20,9 +20,23 @@ export function Hud() {
       <button
         title="Copy an invite link to this workspace"
         onClick={() => {
-          void navigator.clipboard.writeText(location.href).then(() => {
+          const url = location.href;
+          const markCopied = () => {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
+          };
+          // Clipboard API can reject (permissions, focus loss); fall back to
+          // the legacy selection-based copy so the button never fails silently.
+          navigator.clipboard.writeText(url).then(markCopied, () => {
+            const ta = document.createElement("textarea");
+            ta.value = url;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand("copy");
+            ta.remove();
+            if (ok) markCopied();
           });
         }}
       >

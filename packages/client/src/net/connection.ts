@@ -41,8 +41,29 @@ export interface SpaceListing {
 
 export async function fetchSpaces(): Promise<SpaceListing[]> {
   const res = await fetch(`${httpBase}/api/spaces`);
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error(`spaces listing failed: ${res.status}`);
   return (await res.json()) as SpaceListing[];
+}
+
+// A backgrounded tab tears down its connection (see onPageHide below), so
+// someone who joins, then switches apps to send the invite link, silently
+// vanishes from the space. When the tab becomes visible again, reload
+// through ?rejoin=1 — the join screen auto-joins, and a fresh page load
+// guarantees clean Phaser/store state.
+let hasJoined = false;
+let rejoinHooked = false;
+
+function armAutoRejoin(): void {
+  if (rejoinHooked) return;
+  rejoinHooked = true;
+  const maybeRejoin = () => {
+    if (document.visibilityState !== "visible") return;
+    if (!hasJoined || useStore.getState().connected) return;
+    location.replace(`${location.pathname}?rejoin=1`);
+  };
+  document.addEventListener("resume", maybeRejoin);
+  document.addEventListener("visibilitychange", maybeRejoin);
+  window.addEventListener("pageshow", maybeRejoin);
 }
 
 export async function connect(
@@ -146,6 +167,8 @@ export async function connect(
   });
 
   useStore.setState({ connected: true, sessionId: r.sessionId, spaceId });
+  hasJoined = true;
+  armAutoRejoin();
 
   // Fire-and-forget: the permission prompt shouldn't block entering the
   // space; tracks are added to existing connections once granted.

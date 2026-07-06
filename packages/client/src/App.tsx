@@ -18,7 +18,7 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9_-]/g, "")
     .slice(0, 32);
 
-function JoinScreen({ spaceId }: { spaceId: string }) {
+function JoinScreen({ spaceId, invited }: { spaceId: string; invited: boolean }) {
   const [name, setName] = useState(
     () => localStorage.getItem("gather:name") ?? ""
   );
@@ -27,6 +27,9 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
   );
   const [space, setSpace] = useState(spaceId);
   const [spaces, setSpaces] = useState<SpaceListing[]>([]);
+  // "waking" until the first listing succeeds: on free hosting the server
+  // may be cold-starting, which must read differently than "nobody online".
+  const [serverUp, setServerUp] = useState<boolean | null>(null);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,8 +37,12 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
     let alive = true;
     const load = () =>
       fetchSpaces()
-        .then((list) => alive && setSpaces(list))
-        .catch(() => {});
+        .then((list) => {
+          if (!alive) return;
+          setSpaces(list);
+          setServerUp(true);
+        })
+        .catch(() => alive && setServerUp((up) => up && false));
     load();
     const timer = setInterval(load, 5000);
     return () => {
@@ -60,6 +67,16 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
       setJoining(false);
     }
   };
+
+  // A tab that got disconnected while backgrounded reloads itself with
+  // ?rejoin=1 (see connection.ts); rejoin silently so the person stays
+  // present in the space they invited others to.
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has("rejoin")) return;
+    history.replaceState(null, "", location.pathname);
+    if (name.trim()) void join();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="join-screen">
@@ -111,10 +128,17 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
                 </button>
               ))}
             </div>
+          ) : serverUp ? (
+            <p className="ws-empty">
+              {invited
+                ? "Nobody's here yet — join below and you'll be the first one in."
+                : "Nobody is online yet — start a workspace below and invite people with its link."}
+            </p>
           ) : (
             <p className="ws-empty">
-              Nobody is online yet — start a workspace below and invite
-              people with its link.
+              {serverUp === null
+                ? "Checking who's online…"
+                : "Waking up the server — free hosting naps when idle. This can take up to a minute; hang tight."}
             </p>
           )}
           <div className="ws-title ws-or">or create your own</div>
@@ -136,7 +160,11 @@ function JoinScreen({ spaceId }: { spaceId: string }) {
           {joining
             ? "Joining…"
             : `${
-                spaces.some((s) => s.spaceId === (slugify(space) || "lobby"))
+                // An invited slug always says "Join": the room is created on
+                // demand server-side, and "Create" reads like a broken link
+                // to someone who was just sent this URL.
+                spaces.some((s) => s.spaceId === (slugify(space) || "lobby")) ||
+                (invited && (slugify(space) || "lobby") === spaceId)
                   ? "Join"
                   : "Create"
               } ${slugify(space) || "lobby"}`}
@@ -170,7 +198,17 @@ function SpaceView() {
   );
 }
 
-export default function App({ spaceId }: { spaceId: string }) {
+export default function App({
+  spaceId,
+  invited,
+}: {
+  spaceId: string;
+  invited: boolean;
+}) {
   const joined = useStore((s) => s.sessionId !== "");
-  return joined ? <SpaceView /> : <JoinScreen spaceId={spaceId} />;
+  return joined ? (
+    <SpaceView />
+  ) : (
+    <JoinScreen spaceId={spaceId} invited={invited} />
+  );
 }

@@ -18,6 +18,7 @@ Pushed to `github.com/suminnc/gather`. **Live**: client at https://gather-two-je
 
 ## Status
 
+- **2026-07-05 (later)** — Invite-link fix: backgrounded tabs (freeze/pagehide teardown) now auto-rejoin on return via `?rejoin=1` reload; join screen is deep-link-aware (invited slug always shows "Join", cold-start server shows "waking up" instead of "nobody online"); Invite button has a clipboard fallback. Verified locally with simulated freeze/resume.
 - **2026-07-05** — Client built end-to-end (join flow, movement, proximity calls, zone isolation, chat, screen share, map editor). Verified with two clients: movement/collision sync, proximity link/unlink + zone rules, both chat scopes, editor save → live rebuild on other clients + disk persistence, prod serve from :2567. Not yet human-verified: actual camera/mic/screen media flow (automation tabs can't grant `getUserMedia`); the signaling/link layer and no-media degradation are verified. No tests, no STUN/TURN beyond Google STUN, no auth.
 
 ## Memory (Memori)
