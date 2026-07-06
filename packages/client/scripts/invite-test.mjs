@@ -96,7 +96,54 @@ try {
 }
 check(`forged invite rejected (${msg})`, msg.includes("not_invited"));
 
-// 8. Listing is membership-filtered and requires auth.
+// 8. Guest with a valid invite is admitted, but gets no invite token and
+//    is not enrolled as a member.
+const g = new Client(WS);
+const roomG = await g.joinOrCreate("space", {
+  spaceId: "sekrit",
+  name: "Gus",
+  avatar: "avatar_3",
+  guest: true,
+  invite,
+});
+check("guest with invite admitted", !!roomG.sessionId);
+const guestToken = await new Promise((resolve) => {
+  roomG.onMessage("invite:token", (m) => resolve(m.token));
+  setTimeout(() => resolve(null), 1500);
+});
+check("guest receives no invite token", guestToken === null);
+await roomG.leave();
+msg = "";
+try {
+  await g.joinOrCreate("space", {
+    spaceId: "sekrit",
+    name: "Gus",
+    avatar: "avatar_3",
+    guest: true,
+  });
+} catch (e) {
+  msg = String(e.message ?? e);
+}
+check(
+  `guest not enrolled: rejoin without invite rejected (${msg})`,
+  msg.includes("not_invited")
+);
+
+// 9. Guest cannot create a workspace.
+msg = "";
+try {
+  await g.joinOrCreate("space", {
+    spaceId: "guest-town",
+    name: "Gus",
+    avatar: "avatar_3",
+    guest: true,
+  });
+} catch (e) {
+  msg = String(e.message ?? e);
+}
+check(`guest cannot create space (${msg})`, msg.includes("sign_in_to_create"));
+
+// 10. Listing is membership-filtered and requires auth.
 const list = async (email) => {
   const res = await fetch(`${HTTP}/api/spaces`, {
     headers: email ? { Authorization: `Bearer ${fake(email)}` } : {},

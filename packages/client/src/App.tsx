@@ -56,7 +56,21 @@ function JoinScreen({
   // null while the server hasn't answered /api/config yet.
   const [cfg, setCfg] = useState<ServerConfig | null>(null);
   const [auth, setAuth] = useState<AuthInfo | null>(getStoredAuth);
+  const [guest, setGuest] = useState(
+    () => sessionStorage.getItem("gather:guest") === "1"
+  );
   const googleBtn = useRef<HTMLDivElement>(null);
+
+  // Keep the invite token for this tab so a guest's ?rejoin=1 reload (which
+  // strips the query string) can still present it.
+  useEffect(() => {
+    if (invite) sessionStorage.setItem(`gather:invite:${spaceId}`, invite);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const inviteFor = (target: string) =>
+    (target === spaceId ? invite : null) ??
+    sessionStorage.getItem(`gather:invite:${target}`) ??
+    undefined;
 
   useEffect(() => {
     let alive = true;
@@ -120,7 +134,7 @@ function JoinScreen({
     const trimmed = name.trim();
     const target = slugify(space) || "lobby";
     if (!trimmed || joining) return;
-    if (cfg?.auth && !auth) return;
+    if (cfg?.auth && !auth && !guest) return;
     setJoining(true);
     setError(null);
     localStorage.setItem("gather:name", trimmed);
@@ -129,13 +143,18 @@ function JoinScreen({
     try {
       await connect(target, trimmed, avatar, {
         idToken: auth?.idToken,
-        invite: invite ?? undefined,
+        invite: inviteFor(target),
+        guest: !auth && guest,
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "failed to connect";
       if (msg.includes("not_invited")) {
         setError(
           "You haven't been invited to this workspace — ask a member for an invite link."
+        );
+      } else if (msg.includes("sign_in_to_create")) {
+        setError(
+          "Guests can't create workspaces — sign in with Google to create one."
         );
       } else if (msg.includes("sign_in_required")) {
         setError("Your sign-in expired — please sign in again.");
@@ -159,7 +178,7 @@ function JoinScreen({
     if (!rejoinPending.current || !cfg) return;
     rejoinPending.current = false;
     history.replaceState(null, "", location.pathname);
-    if (name.trim() && (!cfg.auth || auth)) void join();
+    if (name.trim() && (!cfg.auth || auth || guest)) void join();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg]);
 
@@ -173,7 +192,7 @@ function JoinScreen({
               ? "Waking up the server — free hosting naps when idle. This can take up to a minute; hang tight."
               : "Connecting to the server…"}
           </p>
-        ) : cfg.auth && !auth ? (
+        ) : cfg.auth && !auth && !guest ? (
           <div className="auth-gate">
             <p className="ws-empty">
               {invited
@@ -181,21 +200,35 @@ function JoinScreen({
                 : "Sign in with Google to continue."}
             </p>
             <div ref={googleBtn} className="google-btn" />
+            <button
+              className="linklike"
+              onClick={() => {
+                sessionStorage.setItem("gather:guest", "1");
+                setGuest(true);
+              }}
+            >
+              or continue as guest
+            </button>
           </div>
         ) : (
           <>
-        {cfg.auth && auth && (
+        {cfg.auth && (
           <p className="auth-line">
-            {auth.email}
+            {auth ? auth.email : "joining as a guest"}
             {" · "}
             <button
               className="linklike"
               onClick={() => {
-                signOut();
-                setAuth(null);
+                if (auth) {
+                  signOut();
+                  setAuth(null);
+                } else {
+                  sessionStorage.removeItem("gather:guest");
+                  setGuest(false);
+                }
               }}
             >
-              sign out
+              {auth ? "sign out" : "sign in instead"}
             </button>
           </p>
         )}
@@ -245,6 +278,12 @@ function JoinScreen({
                 </button>
               ))}
             </div>
+          ) : cfg?.auth && !auth && guest ? (
+            <p className="ws-empty">
+              {invited && inviteFor(spaceId)
+                ? "You're invited — join below."
+                : "As a guest you can only enter workspaces you have an invite link for."}
+            </p>
           ) : serverUp ? (
             <p className="ws-empty">
               {invited

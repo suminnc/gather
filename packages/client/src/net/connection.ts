@@ -89,7 +89,7 @@ export async function connect(
   spaceId: string,
   name: string,
   avatar: string,
-  auth?: { idToken?: string; invite?: string }
+  auth?: { idToken?: string; invite?: string; guest?: boolean }
 ): Promise<void> {
   const endpoint = (httpBase || location.origin).replace(/^http/, "ws");
   const client = new Client(endpoint);
@@ -99,6 +99,7 @@ export async function connect(
     avatar,
     idToken: auth?.idToken,
     invite: auth?.invite,
+    guest: auth?.guest,
   });
   room = r;
 

@@ -37,6 +37,7 @@ interface JoinOptions {
   avatar: string;
   idToken?: string;
   invite?: string;
+  guest?: boolean;
 }
 
 export class SpaceRoom extends Room<SpaceState> {
@@ -105,7 +106,19 @@ export class SpaceRoom extends Room<SpaceState> {
   // the joiner as a member so plain links work for them afterward.
   async onAuth(client: Client, options: JoinOptions) {
     if (!authEnabled) return true;
-    if (!options.idToken) throw new Error("sign_in_required");
+    if (!options.idToken) {
+      // Guests hold no identity, so nothing can be remembered: they get in
+      // only with a currently-valid invite link, never own or create
+      // spaces, and are not enrolled as members.
+      if (options.guest) {
+        if (!getSpace(this.spaceId)) throw new Error("sign_in_to_create");
+        if (options.invite && verifyInvite(this.spaceId, options.invite)) {
+          return { guest: true };
+        }
+        throw new Error("not_invited");
+      }
+      throw new Error("sign_in_required");
+    }
     let user: AuthUser;
     try {
       user = await verifyIdToken(options.idToken);
@@ -138,8 +151,10 @@ export class SpaceRoom extends Room<SpaceState> {
 
     client.send(MSG.chatHistory, this.chatLog);
     // Any member can invite; the tokenized link is what the Invite button
-    // copies. Guest mode (auth disabled) falls back to the plain URL.
-    if (authEnabled) {
+    // copies. Guests can't mint invites, and in open mode (auth disabled)
+    // the button falls back to the plain URL.
+    const identity = (client as { auth?: { email?: string } }).auth;
+    if (authEnabled && identity?.email) {
       client.send(MSG.inviteToken, { token: createInvite(this.spaceId) });
     }
     // Late joiner needs active screen shares to identify incoming tracks.
