@@ -378,6 +378,18 @@ input:focus {
   padding: 4px 8px;
 }
 
+/* Above the emote bar in the bottom-center stack. */
+.door-btn {
+  position: absolute;
+  bottom: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-size: 14px;
+  padding: 7px 14px;
+  border: 1px solid #3d5afe;
+}
+
 /* ---------- people ---------- */
 
 .people-open {

@@ -80,6 +80,8 @@ interface GatherStore {
   spaceId: string;
   sessionId: string;
   connected: boolean;
+  /** Joined via "continue as guest": no lock/invite privileges. */
+  isGuest: boolean;
   /** Signed token for the Invite button's link; null in guest mode. */
   inviteToken: string | null;
   map: MapDoc | null;
@@ -128,6 +130,7 @@ export const useStore = create<GatherStore>()(
       spaceId: "",
       sessionId: "",
       connected: false,
+      isGuest: false,
       inviteToken: null,
       map: null,
       mapRev: 0,

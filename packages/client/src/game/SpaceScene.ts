@@ -2,7 +2,6 @@ import Phaser from "phaser";
 import {
   AVATARS,
   DOOR_GID,
-  doorInsideZones,
   EMOTES,
   KART_GID,
   KART_SPEED_FACTOR,
@@ -13,9 +12,14 @@ import {
   type Direction,
   type MapDoc,
 } from "@gather/shared";
-import { bumpDraft, patchEditor, useStore, type PlayerInfo } from "../store";
 import {
-  sendDoorToggle,
+  bumpDraft,
+  patchEditor,
+  showEditorToast,
+  useStore,
+  type PlayerInfo,
+} from "../store";
+import {
   sendEmote,
   sendKartDismount,
   sendKartMount,
@@ -107,6 +111,7 @@ export class SpaceScene extends Phaser.Scene {
   private hopping = false;
   private sentMoving = false;
   private sentDir: Direction = "down";
+  private lockedToastAt = -Infinity;
 
   private kartSprites = new Map<string, Phaser.GameObjects.Image>();
   /** Door decor images by "x,y", for lock tinting. */
@@ -277,6 +282,12 @@ export class SpaceScene extends Phaser.Scene {
 
     const doorLocked = useStore.getState().lockedDoors.has(`${nx},${ny}`);
     if (!map || !isWalkable(map, nx, ny) || doorLocked) {
+      // Walking into a locked door needs to read as locked, not broken.
+      // (The toast is global despite living in editor state.)
+      if (doorLocked && this.time.now - this.lockedToastAt > 1500) {
+        this.lockedToastAt = this.time.now;
+        showEditorToast("🔒 The door is locked.");
+      }
       // Blocked: just face that way (dist 0 keeps the server happy).
       this.setIdle(this.myId, dir);
       if (this.sentDir !== dir || this.sentMoving) {
@@ -787,10 +798,7 @@ export class SpaceScene extends Phaser.Scene {
 
   private onEditorPointer(pointer: Phaser.Input.Pointer, isDown: boolean): void {
     const { editor } = useStore.getState();
-    if (!editor.active || !editor.draft) {
-      if (isDown && !editor.active) this.onWorldClick(pointer);
-      return;
-    }
+    if (!editor.active || !editor.draft) return;
     const draft = editor.draft;
     const world = pointer.positionToCamera(
       this.cameras.main
@@ -866,30 +874,6 @@ export class SpaceScene extends Phaser.Scene {
         break;
       }
     }
-  }
-
-  /** Clicking an adjacent door toggles its lock (from inside its zone). */
-  private onWorldClick(pointer: Phaser.Input.Pointer): void {
-    const map = useStore.getState().map;
-    if (!map) return;
-    const world = pointer.positionToCamera(
-      this.cameras.main
-    ) as Phaser.Math.Vector2;
-    const tx = Math.floor(world.x / TILE_SIZE);
-    const ty = Math.floor(world.y / TILE_SIZE);
-    const isDoor = map.objects.some(
-      (o) => o.gid === DOOR_GID && o.x === tx && o.y === ty
-    );
-    if (!isDoor) return;
-    if (Math.max(Math.abs(this.localX - tx), Math.abs(this.localY - ty)) > 1) {
-      return;
-    }
-    // Mirror of the server's inside-only rule, to avoid dead clicks.
-    const inside = doorInsideZones(map, tx, ty);
-    const myZone =
-      useStore.getState().players.get(this.myId)?.zoneId ?? "";
-    if (inside.length > 0 && !inside.includes(myZone)) return;
-    sendDoorToggle(tx, ty);
   }
 
   private paintTile(

@@ -22,6 +22,7 @@ import { VideoDock } from "./ui/VideoDock";
 import { MediaControls } from "./ui/MediaControls";
 import { TouchControls } from "./ui/TouchControls";
 import { TheaterOverlay } from "./ui/TheaterOverlay";
+import { DoorButton } from "./ui/DoorButton";
 import { EmoteBar } from "./ui/EmoteBar";
 import { PeoplePanel } from "./ui/PeoplePanel";
 import { EditorPanel } from "./editor/EditorPanel";
@@ -360,6 +361,7 @@ function SpaceView() {
       <VideoDock />
       <ChatPanel />
       {!editing && <EmoteBar />}
+      {!editing && <DoorButton />}
       <PeoplePanel />
       <MediaControls />
       <TouchControls />

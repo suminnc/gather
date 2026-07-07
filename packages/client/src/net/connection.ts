@@ -242,7 +242,12 @@ export async function connect(
     manager.destroy();
   });
 
-  useStore.setState({ connected: true, sessionId: r.sessionId, spaceId });
+  useStore.setState({
+    connected: true,
+    sessionId: r.sessionId,
+    spaceId,
+    isGuest: !!auth?.guest,
+  });
   hasJoined = true;
   armAutoRejoin();
 
