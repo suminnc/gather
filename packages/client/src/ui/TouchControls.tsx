@@ -1,4 +1,3 @@
-import type { Direction } from "@gather/shared";
 import { useStore } from "../store";
 
 // Coarse pointer = touch device; ?touch forces it for testing.
@@ -6,24 +5,40 @@ export const IS_TOUCH_DEVICE =
   window.matchMedia("(pointer: coarse)").matches ||
   new URLSearchParams(location.search).has("touch");
 
-const ARROWS: Record<Direction, string> = {
-  up: "▲",
-  down: "▼",
-  left: "◀",
-  right: "▶",
-};
+interface Pad {
+  label: string;
+  dx: number;
+  dy: number;
+  col: number;
+  row: number;
+}
 
-function PadButton({ dir }: { dir: Direction }) {
-  const active = useStore((s) => s.touchDir === dir);
-  const hold = () => useStore.setState({ touchDir: dir });
+const PADS: Pad[] = [
+  { label: "↖", dx: -1, dy: -1, col: 1, row: 1 },
+  { label: "▲", dx: 0, dy: -1, col: 2, row: 1 },
+  { label: "↗", dx: 1, dy: -1, col: 3, row: 1 },
+  { label: "◀", dx: -1, dy: 0, col: 1, row: 2 },
+  { label: "▶", dx: 1, dy: 0, col: 3, row: 2 },
+  { label: "↙", dx: -1, dy: 1, col: 1, row: 3 },
+  { label: "▼", dx: 0, dy: 1, col: 2, row: 3 },
+  { label: "↘", dx: 1, dy: 1, col: 3, row: 3 },
+];
+
+function PadButton({ pad }: { pad: Pad }) {
+  const active = useStore(
+    (s) => s.touchVec?.[0] === pad.dx && s.touchVec?.[1] === pad.dy
+  );
+  const hold = () => useStore.setState({ touchVec: [pad.dx, pad.dy] });
   const release = () => {
-    if (useStore.getState().touchDir === dir) {
-      useStore.setState({ touchDir: null });
+    const v = useStore.getState().touchVec;
+    if (v && v[0] === pad.dx && v[1] === pad.dy) {
+      useStore.setState({ touchVec: null });
     }
   };
   return (
     <button
-      className={`pad-btn pad-${dir} ${active ? "active" : ""}`}
+      className={`pad-btn ${active ? "active" : ""}`}
+      style={{ gridColumn: pad.col, gridRow: pad.row }}
       onPointerDown={(e) => {
         e.preventDefault();
         try {
@@ -37,7 +52,7 @@ function PadButton({ dir }: { dir: Direction }) {
       onPointerCancel={release}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {ARROWS[dir]}
+      {pad.label}
     </button>
   );
 }
@@ -46,10 +61,9 @@ export function TouchControls() {
   if (!IS_TOUCH_DEVICE) return null;
   return (
     <div className="touch-pad">
-      <PadButton dir="up" />
-      <PadButton dir="left" />
-      <PadButton dir="right" />
-      <PadButton dir="down" />
+      {PADS.map((pad) => (
+        <PadButton key={pad.label} pad={pad} />
+      ))}
     </div>
   );
 }

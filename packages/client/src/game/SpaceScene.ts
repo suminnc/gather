@@ -25,15 +25,9 @@ import {
   sendKartMount,
   sendMove,
 } from "../net/connection";
+import { ensureCustomAvatar } from "./customAvatar";
 
 const DIR_ROW: Record<Direction, number> = { down: 0, left: 1, right: 2, up: 3 };
-const DIR_DELTA: Record<Direction, [number, number]> = {
-  up: [0, -1],
-  down: [0, 1],
-  left: [-1, 0],
-  right: [1, 0],
-};
-
 const px = (tile: number) => tile * TILE_SIZE + TILE_SIZE / 2;
 
 const EMOTE_KEYS = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX"] as const;
@@ -264,8 +258,8 @@ export class SpaceScene extends Phaser.Scene {
       return;
     }
 
-    const dir = this.heldDirection();
-    if (!dir) {
+    const vec = this.heldVector();
+    if (!vec) {
       if (this.sentMoving) {
         this.sentMoving = false;
         sendMove(this.localX, this.localY, this.localDir, false);
@@ -274,16 +268,33 @@ export class SpaceScene extends Phaser.Scene {
       return;
     }
 
+    const { map, lockedDoors } = useStore.getState();
+    const canStep = (tx: number, ty: number) =>
+      !!map && isWalkable(map, tx, ty) && !lockedDoors.has(`${tx},${ty}`);
+
+    let [dx, dy] = vec;
+    // A diagonal hop needs the target and both orthogonals free (no
+    // cutting corners through walls); otherwise slide along a free axis.
+    if (dx !== 0 && dy !== 0) {
+      const diagOk =
+        canStep(this.localX + dx, this.localY + dy) &&
+        canStep(this.localX + dx, this.localY) &&
+        canStep(this.localX, this.localY + dy);
+      if (!diagOk) {
+        if (canStep(this.localX + dx, this.localY)) dy = 0;
+        else if (canStep(this.localX, this.localY + dy)) dx = 0;
+        else dy = 0; // fully blocked; fall through to the blocked branch
+      }
+    }
+    const dir = this.facingFor(dx, dy);
     this.localDir = dir;
-    const map = useStore.getState().map;
-    const [dx, dy] = DIR_DELTA[dir];
     const nx = this.localX + dx;
     const ny = this.localY + dy;
 
-    const doorLocked = useStore.getState().lockedDoors.has(`${nx},${ny}`);
-    if (!map || !isWalkable(map, nx, ny) || doorLocked) {
+    if (!canStep(nx, ny)) {
       // Walking into a locked door needs to read as locked, not broken.
       // (The toast is global despite living in editor state.)
+      const doorLocked = lockedDoors.has(`${nx},${ny}`);
       if (doorLocked && this.time.now - this.lockedToastAt > 1500) {
         this.lockedToastAt = this.time.now;
         showEditorToast("🔒 The door is locked.");
@@ -558,7 +569,7 @@ export class SpaceScene extends Phaser.Scene {
       if (id === this.myId) {
         this.applySeatAndKart(entry, info);
         // Local movement is client-driven; only correct on server respawn.
-        const idle = !this.hopping && !this.heldDirection();
+        const idle = !this.hopping && !this.heldVector();
         if (idle && (info.x !== this.localX || info.y !== this.localY)) {
           this.snapLocal(info.x, info.y);
         }
@@ -600,7 +611,9 @@ export class SpaceScene extends Phaser.Scene {
   private createEntry(id: string, info: PlayerInfo): PlayerEntry {
     const avatar = (AVATARS as readonly string[]).includes(info.avatar)
       ? info.avatar
-      : AVATARS[0];
+      : ensureCustomAvatar(this, info.avatar)
+        ? info.avatar
+        : AVATARS[0];
     const sprite = this.add
       .sprite(0, 0, avatar, DIR_ROW[info.dir] * 3 + 1)
       .setOrigin(0.5);
@@ -730,13 +743,28 @@ export class SpaceScene extends Phaser.Scene {
     entry.sprite.setFrame(DIR_ROW[dir] * 3 + 1);
   }
 
-  private heldDirection(): Direction | null {
+  /** Held movement vector: two keys held = a diagonal. */
+  private heldVector(): [number, number] | null {
     const k = this.keys;
-    if (k.UP.isDown || k.W.isDown) return "up";
-    if (k.DOWN.isDown || k.S.isDown) return "down";
-    if (k.LEFT.isDown || k.A.isDown) return "left";
-    if (k.RIGHT.isDown || k.D.isDown) return "right";
-    return useStore.getState().touchDir;
+    let dx = 0;
+    let dy = 0;
+    if (k.LEFT.isDown || k.A.isDown) dx -= 1;
+    if (k.RIGHT.isDown || k.D.isDown) dx += 1;
+    if (k.UP.isDown || k.W.isDown) dy -= 1;
+    if (k.DOWN.isDown || k.S.isDown) dy += 1;
+    if (dx === 0 && dy === 0) return useStore.getState().touchVec;
+    return [dx, dy];
+  }
+
+  /** 4-direction facing for a (possibly diagonal) move vector. */
+  private facingFor(dx: number, dy: number): Direction {
+    const horiz: Direction | null = dx < 0 ? "left" : dx > 0 ? "right" : null;
+    const vert: Direction | null = dy < 0 ? "up" : dy > 0 ? "down" : null;
+    // Diagonal with only 4 sprite rows: keep the current facing if it
+    // matches one component so the sprite doesn't flicker, else go
+    // horizontal.
+    if (horiz && vert) return this.localDir === vert ? vert : horiz;
+    return horiz ?? vert ?? this.localDir;
   }
 
   // ---------- editor ----------

@@ -7,6 +7,7 @@ import {
   doorInsideZones,
   EMOTES,
   EMOTE_COOLDOWN_MS,
+  isAvatarId,
   KART_GID,
   MAX_CLIENTS,
   MSG,
@@ -164,7 +165,8 @@ export class SpaceRoom extends Room<SpaceState> {
   onJoin(client: Client, options: JoinOptions) {
     const p = new Player();
     p.name = String(options.name ?? "guest").slice(0, 24) || "guest";
-    p.avatar = String(options.avatar ?? "avatar_0");
+    const avatar = String(options.avatar ?? "");
+    p.avatar = isAvatarId(avatar) ? avatar : "avatar_0";
     const spawn =
       this.map.spawns[Math.floor(Math.random() * this.map.spawns.length)];
     p.x = spawn.x;

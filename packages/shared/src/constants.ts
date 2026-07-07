@@ -50,4 +50,12 @@ export const AVATARS = [
   "avatar_11",
 ] as const;
 
+/** Custom avatar id: "c:" + skin.shirt.hair.pants as bare hex colors. */
+export const CUSTOM_AVATAR_RE =
+  /^c:[0-9a-f]{6}\.[0-9a-f]{6}\.[0-9a-f]{6}\.[0-9a-f]{6}$/i;
+
+export function isAvatarId(s: string): boolean {
+  return (AVATARS as readonly string[]).includes(s) || CUSTOM_AVATAR_RE.test(s);
+}
+
 export const DEFAULT_SPACE_ID = "lobby";

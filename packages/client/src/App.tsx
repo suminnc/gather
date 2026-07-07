@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { AVATARS } from "@gather/shared";
 import {
+  customAvatarId,
+  DEFAULT_CUSTOM_COLORS,
+  drawAvatarSheet,
+  parseAvatarId,
+  type AvatarColors,
+} from "./game/customAvatar";
+import {
   connect,
   fetchConfig,
   fetchSpaces,
@@ -27,6 +34,22 @@ import { EmoteBar } from "./ui/EmoteBar";
 import { PeoplePanel } from "./ui/PeoplePanel";
 import { EditorPanel } from "./editor/EditorPanel";
 
+/** Live preview of a custom avatar (idle, facing down). */
+function AvatarPreview({ colors }: { colors: AvatarColors }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const sheet = document.createElement("canvas");
+    sheet.width = 96;
+    sheet.height = 128;
+    drawAvatarSheet(sheet.getContext("2d")!, colors);
+    const ctx = ref.current!.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, 32, 32);
+    ctx.drawImage(sheet, 32, 0, 32, 32, 0, 0, 32, 32);
+  }, [colors]);
+  return <canvas ref={ref} width={32} height={32} className="avatar-img" />;
+}
+
 const slugify = (s: string) =>
   s
     .toLowerCase()
@@ -50,6 +73,14 @@ function JoinScreen({
   const [avatar, setAvatar] = useState(
     () => localStorage.getItem("gather:avatar") ?? AVATARS[0]
   );
+  // Non-null while the custom (make-your-own) avatar is selected.
+  const [custom, setCustom] = useState<AvatarColors | null>(() =>
+    parseAvatarId(localStorage.getItem("gather:avatar") ?? "")
+  );
+  const pickCustom = (colors: AvatarColors) => {
+    setCustom(colors);
+    setAvatar(customAvatarId(colors));
+  };
   const [space, setSpace] = useState(spaceId);
   const [spaces, setSpaces] = useState<SpaceListing[]>([]);
   // "waking" until the first listing succeeds: on free hosting the server
@@ -257,7 +288,10 @@ function JoinScreen({
             <button
               key={a}
               className={`avatar-opt ${avatar === a ? "selected" : ""}`}
-              onClick={() => setAvatar(a)}
+              onClick={() => {
+                setAvatar(a);
+                setCustom(null);
+              }}
             >
               <span
                 className="avatar-img"
@@ -265,7 +299,31 @@ function JoinScreen({
               />
             </button>
           ))}
+          <button
+            className={`avatar-opt ${custom ? "selected" : ""}`}
+            title="Make your own"
+            onClick={() => pickCustom(custom ?? DEFAULT_CUSTOM_COLORS)}
+          >
+            <AvatarPreview colors={custom ?? DEFAULT_CUSTOM_COLORS} />
+            <span className="avatar-edit">✎</span>
+          </button>
         </div>
+        {custom && (
+          <div className="custom-colors">
+            {(["skin", "shirt", "hair", "pants"] as const).map((part) => (
+              <label key={part}>
+                <input
+                  type="color"
+                  value={custom[part]}
+                  onChange={(e) =>
+                    pickCustom({ ...custom, [part]: e.target.value })
+                  }
+                />
+                {part}
+              </label>
+            ))}
+          </div>
+        )}
         <div className="ws-section">
           <div className="ws-title">Join a workspace</div>
           {spaces.length > 0 ? (

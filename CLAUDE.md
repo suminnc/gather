@@ -22,6 +22,8 @@ Env-gated: `GOOGLE_CLIENT_ID` accepts a bare OAuth client id or comma-separated 
 
 ## Status
 
+- **2026-07-07** — Customization + movement batch: custom avatars (join-screen color pickers for skin/shirt/hair/pants; id `c:<hex>.<hex>.<hex>.<hex>` validated server-side via `isAvatarId`; `game/customAvatar.ts` ports the gen-assets drawing and bakes texture+anims per id client-side); diagonal movement (`heldVector` — two held keys or 8-way D-pad corners; corner-cut prevention requiring both orthogonals free, slides along a free axis; server unchanged, Chebyshev guard already allows diagonals); touch pad raised above mobile browser chrome (safe-area insets + 76px) and rebuilt as 8 buttons over store `touchVec` (replaced `touchDir`). Door locks got a proximity Lock/Unlock button (`ui/DoorButton.tsx`, replaces click-on-door) and a "door is locked" toast on blocked movement.
+
 - **2026-07-06 (evening, later 2)** — Inside-only door locks: `doorInsideZones` in shared (door tile's zone + zones of walkable 4-neighbors); when non-empty, only players standing in one of those zones can toggle the lock (server-enforced, client mirrors to avoid dead clicks). Doors with no zone on either side keep the old any-adjacent-member rule. E2E now 24 checks.
 
 - **2026-07-06 (evening, later)** — Theater cameras: the video dock lifts above the theater overlay (`.video-dock.over-theater`, z 16 vs the overlay's 15, tiles shrunk) so viewers still see each other; toggled by a 🎥 button in the theater controls, persisted as store `theaterCams` / localStorage `gather:theaterCams` (default on). Browser-verified both ways.
