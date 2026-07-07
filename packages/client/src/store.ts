@@ -98,6 +98,8 @@ interface GatherStore {
   peers: Map<string, PeerMedia>;
   /** zoneId -> shared playback for theater zones. */
   theaters: Map<string, TheaterInfo>;
+  /** Keep peer cameras visible on top of the theater overlay. */
+  theaterCams: boolean;
   karts: Map<string, KartInfo>;
   /** "x,y" keys of locked door objects. */
   lockedDoors: Set<string>;
@@ -144,6 +146,7 @@ export const useStore = create<GatherStore>()(
       screenStream: null,
       peers: new Map(),
       theaters: new Map(),
+      theaterCams: localStorage.getItem("gather:theaterCams") !== "0",
       karts: new Map(),
       lockedDoors: new Set(),
       emotes: new Map(),
@@ -221,6 +224,11 @@ export function setDoorLocked(key: string, locked: boolean): void {
     else lockedDoors.delete(key);
     return { lockedDoors };
   });
+}
+
+export function setTheaterCams(on: boolean): void {
+  localStorage.setItem("gather:theaterCams", on ? "1" : "0");
+  useStore.setState({ theaterCams: on });
 }
 
 export function setTheater(zoneId: string, info: TheaterInfo): void {

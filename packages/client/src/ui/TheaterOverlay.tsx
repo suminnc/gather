@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sendTheater } from "../net/connection";
-import { useStore } from "../store";
+import { setTheaterCams, useStore } from "../store";
 
 /** Accepts a YouTube URL in any common form, or a bare video id. */
 function parseVideoId(input: string): string | null {
@@ -23,6 +23,7 @@ export function TheaterOverlay() {
   const map = useStore((s) => s.map);
   const zoneId = useStore((s) => s.players.get(s.sessionId)?.zoneId ?? "");
   const theater = useStore((s) => s.theaters.get(zoneId));
+  const cams = useStore((s) => s.theaterCams);
   const [minimized, setMinimized] = useState(false);
   const [url, setUrl] = useState("");
   const [picking, setPicking] = useState(false);
@@ -119,6 +120,12 @@ export function TheaterOverlay() {
             {theater.playing ? "⏸ Pause for everyone" : "▶ Play"}
           </button>
           <button onClick={() => setPicking(!picking)}>Change video</button>
+          <button
+            onClick={() => setTheaterCams(!cams)}
+            title="Show or hide everyone's cameras over the theater"
+          >
+            {cams ? "🎥 Hide cameras" : "🎥 Show cameras"}
+          </button>
           <button onClick={() => sendTheater("stop")}>⏹ End</button>
           <button onClick={() => setMinimized(true)} title="Keep walking around">
             Minimize

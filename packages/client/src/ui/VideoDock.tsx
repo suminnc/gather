@@ -60,13 +60,21 @@ export function VideoDock() {
   const peers = useStore((s) => s.peers);
   const players = useStore((s) => s.players);
   const sessionId = useStore((s) => s.sessionId);
+  // Standing in a theater with a video set puts the overlay above this
+  // dock; the theaterCams option lifts a compact dock back on top of it.
+  const overTheater = useStore((s) => {
+    if (!s.theaterCams) return false;
+    const zoneId = s.players.get(s.sessionId)?.zoneId ?? "";
+    if (!zoneId || !s.theaters.has(zoneId)) return false;
+    return s.map?.zones.find((z) => z.id === zoneId)?.kind === "theater";
+  });
   const myName = players.get(sessionId)?.name ?? "me";
 
   const screens = Array.from(peers).filter(([, m]) => m.screenStream);
   const cams = Array.from(peers);
 
   return (
-    <div className="video-dock">
+    <div className={`video-dock ${overTheater ? "over-theater" : ""}`}>
       {media.denied && (
         <div className="media-warning">
           ⚠️ Camera/mic unavailable — check the site permissions in your

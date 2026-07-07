@@ -278,6 +278,19 @@ input:focus {
   overflow-y: auto;
 }
 
+/* Above the theater overlay (z 15), shrunk so the movie stays visible. */
+.video-dock.over-theater {
+  z-index: 16;
+}
+
+.video-dock.over-theater .tile {
+  width: 140px;
+}
+
+.video-dock.over-theater .tile.screen {
+  width: 220px;
+}
+
 .tile {
   position: relative;
   width: 200px;
