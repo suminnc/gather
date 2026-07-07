@@ -117,6 +117,10 @@ check(
   `locked door blocks (${after.x},${after.y})`,
   after.x === before.x && after.y === before.y
 );
+// Bob is adjacent but outside the theater zone: the lock is inside-only.
+b.send("door:toggle", { x: 16, y: 23 });
+await sleep(200);
+check("outside door toggle ignored", a.state.doors.get("16,23") === true);
 a.send("door:toggle", { x: 16, y: 23 });
 await sleep(200);
 b.send("move", { x: 16, y: 23, dir: "left", moving: true });

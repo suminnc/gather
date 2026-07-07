@@ -76,6 +76,30 @@ export function zoneAt(map: MapDoc, x: number, y: number): ZoneRect | undefined 
   );
 }
 
+/**
+ * Zones considered the "inside" of a door at (x, y): the door tile's own
+ * zone plus the zones of its walkable 4-neighbors. When any exist, only
+ * players standing in one of them may operate the lock — so a room's door
+ * is controlled from within the room. A door with no zone on either side
+ * has no inside and stays operable by anyone adjacent.
+ */
+export function doorInsideZones(map: MapDoc, x: number, y: number): string[] {
+  const ids = new Set<string>();
+  const own = zoneAt(map, x, y);
+  if (own) ids.add(own.id);
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ]) {
+    if (!isWalkable(map, x + dx, y + dy)) continue;
+    const z = zoneAt(map, x + dx, y + dy);
+    if (z) ids.add(z.id);
+  }
+  return [...ids];
+}
+
 export function validateMap(map: unknown): map is MapDoc {
   if (typeof map !== "object" || map === null) return false;
   const m = map as MapDoc;

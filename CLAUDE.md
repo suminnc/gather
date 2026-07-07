@@ -22,6 +22,8 @@ Env-gated: `GOOGLE_CLIENT_ID` accepts a bare OAuth client id or comma-separated 
 
 ## Status
 
+- **2026-07-06 (evening, later 2)** — Inside-only door locks: `doorInsideZones` in shared (door tile's zone + zones of walkable 4-neighbors); when non-empty, only players standing in one of those zones can toggle the lock (server-enforced, client mirrors to avoid dead clicks). Doors with no zone on either side keep the old any-adjacent-member rule. E2E now 24 checks.
+
 - **2026-07-06 (evening, later)** — Theater cameras: the video dock lifts above the theater overlay (`.video-dock.over-theater`, z 16 vs the overlay's 15, tiles shrunk) so viewers still see each other; toggled by a 🎥 button in the theater controls, persisted as store `theaterCams` / localStorage `gather:theaterCams` (default on). Browser-verified both ways.
 
 - **2026-07-06 (evening)** — Presence & expression: emote reactions (shared `EMOTES`, keys 1-6 + `ui/EmoteBar.tsx`; server validates index with a 300ms per-player cooldown and relays transient `emote:new`; emoji floats above the sender in the scene) and a People panel (`ui/PeoplePanel.tsx` — roster with mic/sitting/riding status, 📍 camera flight + pulse ring via store `locate`, 💬 opens a DM thread via store `dmRequest`). Scene emote keys use Phaser Key `down` events, not `JustDown` polling — key state can reset between the DOM event and the next tick on focus changes, silently eating presses. E2E suite now 23 checks; browser-verified incl. the chat typing guard.

@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import {
   AVATARS,
   DOOR_GID,
+  doorInsideZones,
   EMOTES,
   KART_GID,
   KART_SPEED_FACTOR,
@@ -867,7 +868,7 @@ export class SpaceScene extends Phaser.Scene {
     }
   }
 
-  /** Clicking an adjacent door toggles its lock. */
+  /** Clicking an adjacent door toggles its lock (from inside its zone). */
   private onWorldClick(pointer: Phaser.Input.Pointer): void {
     const map = useStore.getState().map;
     if (!map) return;
@@ -883,6 +884,11 @@ export class SpaceScene extends Phaser.Scene {
     if (Math.max(Math.abs(this.localX - tx), Math.abs(this.localY - ty)) > 1) {
       return;
     }
+    // Mirror of the server's inside-only rule, to avoid dead clicks.
+    const inside = doorInsideZones(map, tx, ty);
+    const myZone =
+      useStore.getState().players.get(this.myId)?.zoneId ?? "";
+    if (inside.length > 0 && !inside.includes(myZone)) return;
     sendDoorToggle(tx, ty);
   }
 

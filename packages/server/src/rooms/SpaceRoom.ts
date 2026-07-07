@@ -4,6 +4,7 @@ import {
   CHAIR_GIDS,
   CHAT_HISTORY_LIMIT,
   DOOR_GID,
+  doorInsideZones,
   EMOTES,
   EMOTE_COOLDOWN_MS,
   KART_GID,
@@ -213,7 +214,8 @@ export class SpaceRoom extends Room<SpaceState> {
   /**
    * Members (or anyone in open mode) can lock/unlock an adjacent door
    * object; guests can walk through unlocked doors but cannot operate
-   * the lock.
+   * the lock. Doors bordering a zone are inside-only: the lock works
+   * from within that zone, so outsiders can't unlock a room.
    */
   private handleDoorToggle(client: Client, msg: { x: number; y: number }) {
     const p = this.state.players.get(client.sessionId);
@@ -225,6 +227,8 @@ export class SpaceRoom extends Room<SpaceState> {
       (o) => o.gid === DOOR_GID && o.x === x && o.y === y
     );
     if (!isDoor) return;
+    const inside = doorInsideZones(this.map, x, y);
+    if (inside.length > 0 && !inside.includes(p.zoneId)) return;
     const identity = (client as { auth?: { email?: string } | true }).auth;
     const isGuest = typeof identity === "object" && !identity?.email;
     if (isGuest) return;
