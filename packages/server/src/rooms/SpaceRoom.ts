@@ -4,6 +4,8 @@ import {
   CHAIR_GIDS,
   CHAT_HISTORY_LIMIT,
   DOOR_GID,
+  EMOTES,
+  EMOTE_COOLDOWN_MS,
   KART_GID,
   MAX_CLIENTS,
   MSG,
@@ -15,6 +17,7 @@ import {
   validateMap,
   type ChatMessage,
   type ChatSendMessage,
+  type EmoteSendMessage,
   type MapDoc,
   type MediaStateMessage,
   type MoveMessage,
@@ -110,6 +113,9 @@ export class SpaceRoom extends Room<SpaceState> {
       this.handleKartMount(client, msg)
     );
     this.onMessage(MSG.kartDismount, (client) => this.dismount(client.sessionId));
+    this.onMessage(MSG.emote, (client, msg: EmoteSendMessage) =>
+      this.handleEmote(client, msg)
+    );
 
     this.resetKarts();
 
@@ -188,6 +194,7 @@ export class SpaceRoom extends Room<SpaceState> {
     this.dismount(client.sessionId); // leave the kart behind, not in limbo
     this.state.players.delete(client.sessionId);
     this.screenStreams.delete(client.sessionId);
+    this.lastEmoteAt.delete(client.sessionId);
     // Next proximity tick emits the removed links to survivors.
   }
 
@@ -262,6 +269,21 @@ export class SpaceRoom extends Room<SpaceState> {
   }
 
   private screenStreams = new Map<string, string>();
+
+  private lastEmoteAt = new Map<string, number>();
+
+  /** Reactions are transient, so they relay as messages, not schema state. */
+  private handleEmote(client: Client, msg: EmoteSendMessage) {
+    if (!this.state.players.has(client.sessionId)) return;
+    const emote = Number(msg?.emote);
+    if (!Number.isInteger(emote) || emote < 0 || emote >= EMOTES.length) return;
+    const now = Date.now();
+    if (now - (this.lastEmoteAt.get(client.sessionId) ?? 0) < EMOTE_COOLDOWN_MS) {
+      return;
+    }
+    this.lastEmoteAt.set(client.sessionId, now);
+    this.broadcast(MSG.emoteRelay, { from: client.sessionId, emote });
+  }
 
   private handleMove(client: Client, msg: MoveMessage) {
     const p = this.state.players.get(client.sessionId);

@@ -56,6 +56,11 @@ export interface KartMountMessage {
   kartId: string;
 }
 
+/** Reaction shown above the sender's head; index into EMOTES. */
+export interface EmoteSendMessage {
+  emote: number;
+}
+
 /** Watch-together control, applied to the sender's current theater zone. */
 export interface TheaterMessage {
   action: "set" | "play" | "pause" | "stop";
@@ -97,6 +102,11 @@ export interface ScreenStopRelay {
   from: string;
 }
 
+export interface EmoteRelayMessage {
+  from: string;
+  emote: number;
+}
+
 export const MSG = {
   // client -> server
   move: "move",
@@ -110,6 +120,7 @@ export const MSG = {
   doorToggle: "door:toggle",
   kartMount: "kart:mount",
   kartDismount: "kart:dismount",
+  emote: "emote",
   // server -> client
   proximity: "proximity",
   rtcRelay: "rtc:relay",
@@ -117,6 +128,7 @@ export const MSG = {
   chatHistory: "chat:history",
   screenAnnounceRelay: "screen:announce:relay",
   screenStopRelay: "screen:stop:relay",
+  emoteRelay: "emote:new",
   mapSaveResult: "map:save:result",
   /** Sent to each member on join so the Invite button can build a link. */
   inviteToken: "invite:token",

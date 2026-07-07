@@ -65,6 +65,16 @@ export function ChatPanel() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [chat, open, convo]);
 
+  // The People panel opens DM threads from outside this component.
+  const dmRequest = useStore((s) => s.dmRequest);
+  useEffect(() => {
+    if (!dmRequest) return;
+    useStore.setState({ dmRequest: null });
+    setOpen(true);
+    setOpenDms((d) => (d.includes(dmRequest) ? d : [...d, dmRequest]));
+    setConvo(`dm:${dmRequest}`);
+  }, [dmRequest]);
+
   // A DM from someone new should surface as a thread with a badge even if
   // the recipient never opened it, which dmPeers already handles; if the
   // active DM peer left, fall back to nearby.

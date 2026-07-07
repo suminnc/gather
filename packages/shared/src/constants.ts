@@ -30,6 +30,11 @@ export const MAX_CUSTOM_TILE_DATA = 8192;
 /** Nearby chat reaches players in the same zone or within this tile distance. */
 export const NEARBY_CHAT_DIST = DISCONNECT_DIST;
 
+/** Reactions shown above a player's head; clients send the index. */
+export const EMOTES = ["👋", "❤️", "👍", "😂", "🎉", "❓"] as const;
+/** Server drops emotes sent faster than this per player. */
+export const EMOTE_COOLDOWN_MS = 300;
+
 export const AVATARS = [
   "avatar_0",
   "avatar_1",

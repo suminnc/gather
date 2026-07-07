@@ -4,6 +4,7 @@ import {
   type ChatMessage,
   type ChatScope,
   type Direction,
+  type EmoteRelayMessage,
   type MapDoc,
   type ProximityMessage,
   type RtcRelayMessage,
@@ -16,6 +17,7 @@ import {
   removePlayer,
   removeTheater,
   setDoorLocked,
+  setEmote,
   setKart,
   setChatHistory,
   setMap,
@@ -202,6 +204,9 @@ export async function connect(
   r.onMessage(MSG.screenStopRelay, (m: ScreenStopRelay) =>
     manager.onScreenStop(m.from)
   );
+  r.onMessage(MSG.emoteRelay, (m: EmoteRelayMessage) =>
+    setEmote(m.from, m.emote)
+  );
   r.onMessage(MSG.inviteToken, (m: { token: string }) => {
     useStore.setState({ inviteToken: m.token });
   });
@@ -273,6 +278,10 @@ export function sendKartMount(kartId: string): void {
 
 export function sendKartDismount(): void {
   room?.send(MSG.kartDismount);
+}
+
+export function sendEmote(emote: number): void {
+  room?.send(MSG.emote, { emote });
 }
 
 export function sendTheater(

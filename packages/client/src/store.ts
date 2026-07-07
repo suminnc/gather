@@ -101,6 +101,12 @@ interface GatherStore {
   karts: Map<string, KartInfo>;
   /** "x,y" keys of locked door objects. */
   lockedDoors: Set<string>;
+  /** sessionId -> latest reaction; seq bumps so repeats retrigger. */
+  emotes: Map<string, { emote: number; seq: number }>;
+  /** Open-a-DM-thread request from outside the chat panel (People list). */
+  dmRequest: string | null;
+  /** Camera locate request; seq bumps so repeat clicks retrigger. */
+  locate: { id: string; seq: number } | null;
   editor: EditorState;
 }
 
@@ -140,6 +146,9 @@ export const useStore = create<GatherStore>()(
       theaters: new Map(),
       karts: new Map(),
       lockedDoors: new Set(),
+      emotes: new Map(),
+      dmRequest: null,
+      locate: null,
       editor: initialEditor,
     })
   )
@@ -153,8 +162,28 @@ export function removePlayer(id: string): void {
   useStore.setState((s) => {
     const players = new Map(s.players);
     players.delete(id);
-    return { players };
+    const emotes = new Map(s.emotes);
+    emotes.delete(id);
+    return { players, emotes };
   });
+}
+
+let emoteSeq = 0;
+
+export function setEmote(id: string, emote: number): void {
+  useStore.setState((s) => ({
+    emotes: new Map(s.emotes).set(id, { emote, seq: ++emoteSeq }),
+  }));
+}
+
+let locateSeq = 0;
+
+export function requestLocate(id: string): void {
+  useStore.setState({ locate: { id, seq: ++locateSeq } });
+}
+
+export function requestDm(id: string): void {
+  useStore.setState({ dmRequest: id });
 }
 
 export function setMap(map: MapDoc): void {

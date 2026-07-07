@@ -149,6 +149,32 @@ b.send("kart:mount", { kartId: "k2" });
 await sleep(200);
 check("distant kart mount rejected", b.state.karts.get("k2").rider === "");
 
+// 13. Emotes: relayed to everyone (sender included), invalid index rejected,
+// per-player cooldown drops rapid repeats.
+const emotesA = [];
+const emotesB = [];
+a.onMessage("emote:new", (m) => emotesA.push(m));
+b.onMessage("emote:new", (m) => emotesB.push(m));
+a.send("emote", { emote: 2 });
+await sleep(300);
+check(
+  "emote relayed to sender and others",
+  emotesA.some((m) => m.from === a.sessionId && m.emote === 2) &&
+    emotesB.some((m) => m.from === a.sessionId && m.emote === 2)
+);
+b.send("emote", { emote: 99 });
+b.send("emote", { emote: -1 });
+b.send("emote", { emote: "nope" });
+await sleep(300);
+check("invalid emote rejected", !emotesA.some((m) => m.from === b.sessionId));
+a.send("emote", { emote: 0 });
+a.send("emote", { emote: 1 }); // lands within the cooldown window
+await sleep(400);
+check(
+  "emote cooldown drops rapid repeats",
+  emotesB.filter((m) => m.from === a.sessionId).length === 2
+);
+
 await a.leave();
 await b.leave();
 console.log(`\n${pass} passed, ${fail} failed`);

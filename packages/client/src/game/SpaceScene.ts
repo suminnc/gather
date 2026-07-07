@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import {
   AVATARS,
   DOOR_GID,
+  EMOTES,
   KART_GID,
   KART_SPEED_FACTOR,
   MOVE_MS,
@@ -14,6 +15,7 @@ import {
 import { bumpDraft, patchEditor, useStore, type PlayerInfo } from "../store";
 import {
   sendDoorToggle,
+  sendEmote,
   sendKartDismount,
   sendKartMount,
   sendMove,
@@ -28,6 +30,8 @@ const DIR_DELTA: Record<Direction, [number, number]> = {
 };
 
 const px = (tile: number) => tile * TILE_SIZE + TILE_SIZE / 2;
+
+const EMOTE_KEYS = ["ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX"] as const;
 
 /** Bresenham line between two tiles, inclusive of both endpoints. */
 function lineTiles(
@@ -142,9 +146,20 @@ export class SpaceScene extends Phaser.Scene {
     // enableCapture=false: capturing preventDefaults these keys globally,
     // which silently ate W/A/S/D (and arrow cursoring) in the chat input.
     this.keys = this.input.keyboard!.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,E",
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,E,ONE,TWO,THREE,FOUR,FIVE,SIX",
       false
     ) as Record<string, Phaser.Input.Keyboard.Key>;
+    // Event-based (not JustDown polling): key state can be reset between
+    // the DOM event and the next update tick, e.g. on focus changes.
+    EMOTE_KEYS.forEach((key, i) => {
+      this.keys[key].on(
+        Phaser.Input.Keyboard.Events.DOWN,
+        (_key: unknown, e: KeyboardEvent | undefined) => {
+          const { typingLock, editor } = useStore.getState();
+          if (!typingLock && !editor.active && !e?.repeat) sendEmote(i);
+        }
+      );
+    });
     if (import.meta.env.DEV) (window as any).__scene = this;
 
     const store = useStore.getState();
@@ -207,6 +222,16 @@ export class SpaceScene extends Phaser.Scene {
       useStore.subscribe(
         (s) => s.lockedDoors,
         (locked) => this.tintDoors(locked)
+      ),
+      useStore.subscribe(
+        (s) => s.emotes,
+        (emotes) => this.syncEmotes(emotes)
+      ),
+      useStore.subscribe(
+        (s) => s.locate,
+        (locate) => {
+          if (locate) this.locatePlayer(locate.id);
+        }
       )
     );
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -627,6 +652,63 @@ export class SpaceScene extends Phaser.Scene {
       img.setAlpha(isLocked ? 1 : 0.55);
       img.setTint(isLocked ? 0xff8888 : 0xffffff);
     }
+  }
+
+  private lastEmoteSeq = new Map<string, number>();
+
+  /** Float the new reactions up from their sender's head. */
+  private syncEmotes(emotes: Map<string, { emote: number; seq: number }>): void {
+    for (const [id, e] of emotes) {
+      if (this.lastEmoteSeq.get(id) === e.seq) continue;
+      this.lastEmoteSeq.set(id, e.seq);
+      const entry = this.entries.get(id);
+      if (!entry) continue;
+      const text = this.add
+        .text(entry.container.x, entry.container.y - 34, EMOTES[e.emote], {
+          fontSize: "18px",
+          resolution: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(10000);
+      this.tweens.add({
+        targets: text,
+        y: text.y - 24,
+        alpha: 0,
+        duration: 1800,
+        ease: "Cubic.easeOut",
+        onComplete: () => text.destroy(),
+      });
+    }
+  }
+
+  /** Fly the camera to a player, pulse a ring on them, then fly back. */
+  private locatePlayer(id: string): void {
+    if (useStore.getState().editor.active) return;
+    const target = this.entries.get(id);
+    if (!target) return;
+    const cam = this.cameras.main;
+    cam.stopFollow();
+    cam.pan(target.container.x, target.container.y, 450, "Sine.easeInOut");
+    const ring = this.add
+      .circle(target.container.x, target.container.y - 4, 12)
+      .setStrokeStyle(3, 0xffd166, 1)
+      .setDepth(10001);
+    this.tweens.add({
+      targets: ring,
+      scale: 2,
+      alpha: 0,
+      duration: 550,
+      repeat: 2,
+      onComplete: () => ring.destroy(),
+    });
+    this.time.delayedCall(1900, () => {
+      const me = this.entries.get(this.myId);
+      if (!me || useStore.getState().editor.active) return;
+      cam.pan(me.container.x, me.container.y, 450, "Sine.easeInOut");
+      this.time.delayedCall(470, () =>
+        cam.startFollow(me.container, true, 0.15, 0.15)
+      );
+    });
   }
 
   private setIdle(id: string, dir: Direction): void {

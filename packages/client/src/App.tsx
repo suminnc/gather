@@ -22,6 +22,8 @@ import { VideoDock } from "./ui/VideoDock";
 import { MediaControls } from "./ui/MediaControls";
 import { TouchControls } from "./ui/TouchControls";
 import { TheaterOverlay } from "./ui/TheaterOverlay";
+import { EmoteBar } from "./ui/EmoteBar";
+import { PeoplePanel } from "./ui/PeoplePanel";
 import { EditorPanel } from "./editor/EditorPanel";
 
 const slugify = (s: string) =>
@@ -357,6 +359,8 @@ function SpaceView() {
       <Hud />
       <VideoDock />
       <ChatPanel />
+      {!editing && <EmoteBar />}
+      <PeoplePanel />
       <MediaControls />
       <TouchControls />
       {editing && <EditorPanel />}
