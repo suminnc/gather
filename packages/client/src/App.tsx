@@ -411,6 +411,23 @@ function SpaceView() {
   const toast = useStore((s) => s.editor.toast);
   const connected = useStore((s) => s.connected);
 
+  // Clicking anywhere outside a text box leaves typing mode — the game
+  // canvas swallows focus changes, so an explicit blur is needed.
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      const active = document.activeElement;
+      if (
+        !(active instanceof HTMLInputElement) &&
+        !(active instanceof HTMLTextAreaElement)
+      )
+        return;
+      if (e.target === active) return;
+      active.blur();
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, []);
+
   if (!map) return <div className="loading">loading map…</div>;
 
   return (

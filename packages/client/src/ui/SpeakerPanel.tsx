@@ -9,22 +9,39 @@ import {
 } from "@gather/shared";
 import { sendSpeaker } from "../net/connection";
 import { useStore, type SpeakerInfo } from "../store";
+import { FloatingPanel } from "./FloatingPanel";
+
+const PANEL_W = 360;
+const VOL_KEY = "gather:musicVol";
 
 /**
  * One playing speaker's audio. YouTube runs synchronized in a hidden
- * iframe; Spotify / Apple Music only ship embed widgets (no autoplay or
- * seek), so those render a compact player each listener starts.
+ * iframe (volume driven over the embed's postMessage API); Spotify /
+ * Apple Music only ship embed widgets (no autoplay, seek, or volume),
+ * so those render a compact player each listener starts.
  */
-function SpeakerAudio({ id, info }: { id: string; info: SpeakerInfo }) {
+function SpeakerAudio({
+  id,
+  info,
+  volume,
+}: {
+  id: string;
+  info: SpeakerInfo;
+  volume: number;
+}) {
   const src: MusicSource = {
     provider: info.provider as MusicSource["provider"],
     key: info.key,
   };
-  // Estimated playback position when this state arrived (server clock).
-  const receivedAt = useRef(Date.now());
-  useEffect(() => {
-    receivedAt.current = Date.now();
-  }, [info]);
+  const frame = useRef<HTMLIFrameElement>(null);
+
+  const setVolume = (v: number) => {
+    frame.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func: "setVolume", args: [v] }),
+      "*"
+    );
+  };
+  useEffect(() => setVolume(volume), [volume]);
 
   if (info.provider === "youtube") {
     if (!info.playing) return null;
@@ -33,16 +50,25 @@ function SpeakerAudio({ id, info }: { id: string; info: SpeakerInfo }) {
     );
     return (
       <iframe
+        ref={frame}
         key={`${info.key}:${info.timeMs}:${info.updatedAt}`}
         className="speaker-audio"
-        src={`${musicEmbedUrl(src)}?autoplay=1&start=${startSec}&playsinline=1`}
+        src={`${musicEmbedUrl(src)}?autoplay=1&start=${startSec}&playsinline=1&enablejsapi=1`}
         title={`Speaker ${id}`}
         allow="autoplay; encrypted-media"
+        onLoad={() => {
+          // The player accepts commands only once it's ready; nudge the
+          // volume a few times instead of loading the whole IFrame API.
+          for (const delay of [300, 900, 2000]) {
+            setTimeout(() => setVolume(volume), delay);
+          }
+        }}
       />
     );
   }
   return (
     <iframe
+      ref={frame}
       className="speaker-embed"
       src={musicEmbedUrl(src)}
       title={`Speaker ${id}`}
@@ -53,16 +79,24 @@ function SpeakerAudio({ id, info }: { id: string; info: SpeakerInfo }) {
 }
 
 /**
- * Room music from placed speaker objects. Everyone in the speaker's room
- * (its zone, or the whole un-zoned outside) hears it; only players
- * standing next to the speaker get the controls.
+ * The room's music window: one movable panel (top-center by default,
+ * under the workspace bar) combining now-playing volume, the per-room
+ * players, and the controls you get while standing next to a speaker.
+ * Everyone in the speaker's room (its zone, or the whole un-zoned
+ * outside) hears the music; the volume slider is local to you and only
+ * affects music, not voice chat.
  */
 export function SpeakerPanel() {
   const map = useStore((s) => s.map);
   const me = useStore((s) => s.players.get(s.sessionId));
   const speakers = useStore((s) => s.speakers);
   const [url, setUrl] = useState("");
-  const [muted, setMuted] = useState(false);
+  const [vol, setVol] = useState(() => {
+    const saved = Number(localStorage.getItem(VOL_KEY));
+    return Number.isFinite(saved) && localStorage.getItem(VOL_KEY) !== null
+      ? Math.min(100, Math.max(0, saved))
+      : 100;
+  });
 
   if (!map || !me) return null;
   const myRoom = me.zoneId ?? "";
@@ -82,32 +116,62 @@ export function SpeakerPanel() {
     .map((o) => ({ id: o.id, info: speakers.get(o.id) }))
     .filter((s): s is { id: string; info: SpeakerInfo } => !!s.info);
 
+  // Nothing to hear and nothing to control: no window.
+  if (!near && playing.length === 0) return null;
+
   const positionMs = (info: SpeakerInfo) =>
     info.playing
       ? info.timeMs + Math.max(0, Date.now() - info.updatedAt)
       : info.timeMs;
 
+  const changeVol = (v: number) => {
+    setVol(v);
+    localStorage.setItem(VOL_KEY, String(v));
+  };
+
   const setMusic = () => {
     if (!near || !parseMusicSource(url)) return;
     sendSpeaker(near.id, "set", url);
     setUrl("");
-    setMuted(false);
   };
 
   return (
-    <div className="speaker-dock">
-      {playing.length > 0 && (
-        <div className="speaker-now">
-          <span>🔊 room music</span>
-          <button onClick={() => setMuted(!muted)}>
-            {muted ? "Unmute" : "Mute for me"}
-          </button>
+    <FloatingPanel
+      id="music"
+      className="music-panel"
+      defaultRect={{
+        x: Math.max(8, Math.round((innerWidth - PANEL_W) / 2)),
+        y: 56,
+        w: PANEL_W,
+      }}
+      resizable={false}
+    >
+      <div className="editor-header fp-drag">
+        <span>🎵 Music</span>
+        {playing.length > 0 && (
+          <div className="music-volume" title="Music volume (just for you)">
+            <span>{vol === 0 ? "🔇" : "🔊"}</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={vol}
+              onChange={(e) => changeVol(Number(e.target.value))}
+            />
+          </div>
+        )}
+      </div>
+
+      {playing.map((s) => (
+        <SpeakerAudio key={s.id} id={s.id} info={s.info} volume={vol} />
+      ))}
+      {playing.some((s) => s.info.provider !== "youtube") && (
+        <div className="music-hint">
+          Spotify / Apple Music can't auto-start — press play on the widget.
         </div>
       )}
-      {!muted &&
-        playing.map((s) => <SpeakerAudio key={s.id} id={s.id} info={s.info} />)}
 
-      {near && (
+      {near ? (
         <div className="speaker-controls">
           <span title="You're next to a speaker">📻</span>
           {nearState ? (
@@ -123,7 +187,7 @@ export function SpeakerPanel() {
                     )
                   }
                 >
-                  {nearState.playing ? "⏸" : "▶"}
+                  {nearState.playing ? "⏸ Pause for room" : "▶ Play"}
                 </button>
               )}
               <button onClick={() => sendSpeaker(near.id, "stop")}>⏹ Stop</button>
@@ -151,7 +215,11 @@ export function SpeakerPanel() {
             </>
           )}
         </div>
+      ) : (
+        <div className="music-hint">
+          🔊 Room music — walk up to the speaker to control it.
+        </div>
       )}
-    </div>
+    </FloatingPanel>
   );
 }

@@ -1012,43 +1012,44 @@ input:focus {
   padding: 6px;
 }
 
-/* Room-music speaker dock */
-.speaker-dock {
-  position: absolute;
-  left: 12px;
-  bottom: 96px;
-  z-index: 11;
+/* Room-music window (movable; top-center by default) */
+.music-panel {
+  background: rgba(29, 32, 39, 0.96);
+  border: 1px solid #2a2e38;
+  border-radius: 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-width: 340px;
+  gap: 8px;
+  width: 360px;
+  z-index: 12;
 }
-.speaker-now {
+.music-volume {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(16, 18, 22, 0.85);
-  border: 1px solid #2a2e38;
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
+  gap: 6px;
+  flex: 1;
+  margin-left: 12px;
 }
-.speaker-now button,
+.music-volume input[type="range"] {
+  flex: 1;
+  min-width: 80px;
+}
+.music-hint {
+  font-size: 12px;
+  color: #9aa1b0;
+}
+.speaker-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .speaker-controls button {
   background: #20242c;
   border: 1px solid #2a2e38;
   border-radius: 6px;
   padding: 4px 8px;
   cursor: pointer;
-}
-.speaker-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(16, 18, 22, 0.85);
-  border: 1px solid #2a2e38;
-  border-radius: 8px;
-  padding: 6px 10px;
 }
 .speaker-controls input {
   flex: 1;
@@ -1071,7 +1072,7 @@ input:focus {
 }
 /* Spotify / Apple Music widgets need a click, so they stay visible. */
 .speaker-embed {
-  width: 320px;
+  width: 100%;
   height: 80px;
   border: 0;
   border-radius: 10px;
