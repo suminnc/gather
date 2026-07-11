@@ -19,7 +19,8 @@ import {
   googleClientIdsByOrigin,
   verifyIdToken,
 } from "./auth/google";
-import { spacesFor } from "./auth/registry";
+import { getSpace, initRegistry, spacesFor } from "./auth/registry";
+import { kvEnabled } from "./storage/kv";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIST = path.resolve(HERE, "../../client/dist");
@@ -75,10 +76,14 @@ app.get("/api/spaces", async (req, res) => {
   res.json(
     spacesFor(email).map((spaceId) => {
       const room = byId.get(spaceId);
+      const rec = getSpace(spaceId);
       return {
         spaceId,
         clients: room?.clients ?? 0,
         maxClients: room?.maxClients ?? MAX_CLIENTS,
+        role: rec?.owner === email ? "owner" : "member",
+        members: rec?.members.length ?? 1,
+        createdAt: rec?.createdAt ?? 0,
       };
     })
   );
@@ -105,6 +110,12 @@ const gameServer = new Server({
 
 gameServer.define("space", SpaceRoom).filterBy(["spaceId"]);
 
+// Durable state (workspace registry + invite secret) must be in memory
+// before the first join or invite check.
+await initRegistry();
+
 server.listen(PORT, () => {
-  console.log(`gather server listening on :${PORT}`);
+  console.log(
+    `gather server listening on :${PORT} (storage: ${kvEnabled ? "upstash" : "disk"})`
+  );
 });

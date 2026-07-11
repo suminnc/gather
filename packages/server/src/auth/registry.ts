@@ -2,11 +2,14 @@ import { promises as fs, readFileSync, writeFileSync, mkdirSync } from "node:fs"
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { kvEnabled, kvGet, kvSet } from "../storage/kv";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.DATA_DIR ?? path.resolve(HERE, "../../data");
 const SPACES_FILE = path.join(DATA_DIR, "spaces.json");
 const SECRET_FILE = path.join(DATA_DIR, "invite-secret");
+const REGISTRY_KEY = "gather:spaces";
+const SECRET_KEY = "gather:invite-secret";
 
 export interface SpaceRecord {
   owner: string;
@@ -25,10 +28,47 @@ let registry: Registry = (() => {
 })();
 
 async function persist(): Promise<void> {
+  if (kvEnabled) {
+    try {
+      await kvSet(REGISTRY_KEY, JSON.stringify(registry));
+    } catch (err) {
+      console.error("kv registry persist failed:", err);
+    }
+    return;
+  }
   await fs.mkdir(DATA_DIR, { recursive: true });
   const tmp = `${SPACES_FILE}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(registry, null, 2), "utf8");
   await fs.rename(tmp, SPACES_FILE);
+}
+
+/**
+ * Pulls the durable registry + invite secret out of KV before the server
+ * starts taking joins. Without KV this is a no-op: the module-level disk
+ * reads above already did the work (dev / single-box deployments).
+ */
+export async function initRegistry(): Promise<void> {
+  if (!kvEnabled) return;
+  try {
+    const raw = await kvGet(REGISTRY_KEY);
+    if (raw) registry = JSON.parse(raw) as Registry;
+  } catch (err) {
+    console.error("kv registry load failed (starting empty):", err);
+  }
+  // An INVITE_SECRET env always wins; otherwise the first boot persists
+  // its generated secret so invite links keep working across redeploys.
+  if (!process.env.INVITE_SECRET) {
+    try {
+      const hex = await kvGet(SECRET_KEY);
+      if (hex) {
+        SECRET = Buffer.from(hex.trim(), "hex");
+      } else {
+        await kvSet(SECRET_KEY, SECRET.toString("hex"));
+      }
+    } catch (err) {
+      console.error("kv invite-secret load failed (using local):", err);
+    }
+  }
 }
 
 export function getSpace(spaceId: string): SpaceRecord | undefined {
@@ -64,9 +104,9 @@ export function spacesFor(email: string): string[] {
 }
 
 // Invite links carry an HMAC token so possession of the link is the
-// credential; the secret persists on disk so tokens survive restarts
-// (best-effort on ephemeral hosting).
-const SECRET: Buffer = (() => {
+// credential; the secret persists (KV via initRegistry, else disk) so
+// tokens survive restarts and redeploys.
+let SECRET: Buffer = (() => {
   const env = process.env.INVITE_SECRET;
   if (env) return Buffer.from(env, "utf8");
   try {

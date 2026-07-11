@@ -82,6 +82,56 @@ input:focus {
   text-align: center;
 }
 
+/* Roomier card once there's a workspace gallery to show. */
+.join-card.wide {
+  width: min(560px, calc(100vw - 32px));
+}
+
+/* Saved-workspace gallery: click a card to walk in */
+.space-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.space-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  background: #20242c;
+  border: 1px solid #2a2e38;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.space-card:hover:not(:disabled) {
+  border-color: #3d5afe;
+  background: #232a38;
+}
+.space-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.space-card-name {
+  font-weight: 700;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.space-card-role {
+  font-size: 11px;
+  color: #9aa1b0;
+}
+.space-card-role.owner {
+  color: #d8a13c;
+}
+.space-card-meta {
+  font-size: 11px;
+  color: #9aa1b0;
+}
+
 .join-card h1 {
   margin: 0;
   font-size: 28px;

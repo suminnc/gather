@@ -46,6 +46,10 @@ export interface SpaceListing {
   spaceId: string;
   clients: number;
   maxClients: number;
+  /** Present when signed in: the caller's relationship to the space. */
+  role?: "owner" | "member";
+  members?: number;
+  createdAt?: number;
 }
 
 export interface ServerConfig {

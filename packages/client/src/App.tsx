@@ -171,9 +171,9 @@ function JoinScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth]);
 
-  const join = async () => {
+  const join = async (targetId?: string) => {
     const trimmed = name.trim();
-    const target = slugify(space) || "lobby";
+    const target = targetId ?? (slugify(space) || "lobby");
     if (!trimmed || joining) return;
     if (cfg?.auth && !auth && !guest) return;
     setJoining(true);
@@ -225,7 +225,7 @@ function JoinScreen({
 
   return (
     <div className="join-screen">
-      <div className="join-card">
+      <div className={`join-card ${spaces.length > 1 ? "wide" : ""}`}>
         <h1>gather</h1>
         {cfg === null ? (
           <p className="ws-empty">
@@ -327,23 +327,33 @@ function JoinScreen({
           </div>
         )}
         <div className="ws-section">
-          <div className="ws-title">Join a workspace</div>
+          <div className="ws-title">
+            {auth ? "Your workspaces" : "Join a workspace"}
+          </div>
           {spaces.length > 0 ? (
-            <div className="space-list">
+            // Click a card to walk straight in (name/avatar above apply).
+            <div className="space-gallery">
               {spaces.map((s) => (
                 <button
                   key={s.spaceId}
-                  className={`space-opt ${
-                    slugify(space) === s.spaceId ? "selected" : ""
-                  }`}
-                  onClick={() => setSpace(s.spaceId)}
+                  className="space-card"
+                  disabled={!name.trim() || joining}
+                  title={
+                    name.trim()
+                      ? `Open ${s.spaceId}`
+                      : "Enter your name first"
+                  }
+                  onClick={() => void join(s.spaceId)}
                 >
-                  <span>
-                    {slugify(space) === s.spaceId ? "✓ " : ""}
-                    {s.spaceId}
-                  </span>
-                  <span className="space-count">
-                    {s.clients}/{s.maxClients} online
+                  <span className="space-card-name">{s.spaceId}</span>
+                  {s.role && (
+                    <span className={`space-card-role ${s.role}`}>
+                      {s.role === "owner" ? "👑 owner" : "member"}
+                    </span>
+                  )}
+                  <span className="space-card-meta">
+                    {s.clients > 0 ? `🟢 ${s.clients} online` : "○ empty"}
+                    {s.members ? ` · ${s.members} member${s.members === 1 ? "" : "s"}` : ""}
                   </span>
                 </button>
               ))}
@@ -369,7 +379,9 @@ function JoinScreen({
                 : "Waking up the server — free hosting naps when idle. This can take up to a minute; hang tight."}
             </p>
           )}
-          <div className="ws-title ws-or">or create your own</div>
+          <div className="ws-title ws-or">
+            {auth ? "create a new workspace" : "or create your own"}
+          </div>
           <input
             placeholder="new-workspace-name"
             value={space}
