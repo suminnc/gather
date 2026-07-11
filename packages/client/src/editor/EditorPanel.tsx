@@ -18,6 +18,43 @@ const OBJECT_GIDS = [
   16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
 ];
 
+/** Hover names for the curated tileset (see scripts/build-tileset.mjs). */
+const GID_NAMES: Record<number, string> = {
+  0: "Wood floor",
+  1: "Gray stone floor",
+  2: "Beige floor",
+  3: "Grass",
+  4: "Terracotta floor",
+  5: "Teal floor",
+  6: "Dark wood floor",
+  7: "Dark gray floor",
+  8: "Beige wall",
+  9: "Gray wall",
+  10: "Blue-gray wall",
+  11: "Stone brick wall",
+  12: "Beige stone wall",
+  13: "Stone block wall",
+  14: "Gray brick wall",
+  15: "Beige brick wall",
+  16: "Chair (facing down) — sit by stepping on",
+  17: "Chair (facing up) — sit by stepping on",
+  18: "Armchair — sit by stepping on",
+  19: "White chair — sit by stepping on",
+  20: "Small table",
+  21: "Bookshelf",
+  22: "Piano",
+  23: "Screen (left)",
+  24: "Screen (middle)",
+  25: "Screen (right)",
+  26: "Speaker — plays music for its room",
+  27: "Potted plant",
+  28: "Door — lockable from inside",
+  29: "Tree",
+  30: "Pine tree",
+  31: "Bush",
+  32: "Go-kart — step on to ride, E to hop off",
+};
+
 function TileSwatch({
   gid,
   custom,
@@ -35,6 +72,7 @@ function TileSwatch({
   return (
     <button
       className={`swatch ${selected ? "selected" : ""}`}
+      title={custom ? `Your design #${gid - 999}` : GID_NAMES[gid] ?? `Tile ${gid}`}
       onClick={onClick}
     >
       {/* The tile renders in an inner 32×32 span so the button's border

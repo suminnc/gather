@@ -168,6 +168,15 @@ export class SpaceScene extends Phaser.Scene {
         }
       );
     });
+    // E hops off a kart (same event-based reasoning as the emote keys).
+    this.keys.E.on(
+      Phaser.Input.Keyboard.Events.DOWN,
+      (_key: unknown, e: KeyboardEvent | undefined) => {
+        const { typingLock, editor, players } = useStore.getState();
+        if (typingLock || editor.active || e?.repeat) return;
+        if (players.get(this.myId)?.riding) sendKartDismount();
+      }
+    );
     if (import.meta.env.DEV) (window as any).__scene = this;
 
     const store = useStore.getState();
@@ -256,15 +265,6 @@ export class SpaceScene extends Phaser.Scene {
       return;
     }
     if (typingLock || this.hopping) return;
-
-    // E hops off a kart, leaving it on the current tile.
-    if (
-      Phaser.Input.Keyboard.JustDown(this.keys.E) &&
-      useStore.getState().players.get(this.myId)?.riding
-    ) {
-      sendKartDismount();
-      return;
-    }
 
     const vec = this.heldVector();
     if (!vec) {

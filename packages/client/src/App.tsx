@@ -31,6 +31,7 @@ import { TouchControls } from "./ui/TouchControls";
 import { TheaterOverlay } from "./ui/TheaterOverlay";
 import { DoorButton } from "./ui/DoorButton";
 import { EmoteBar } from "./ui/EmoteBar";
+import { KartButton } from "./ui/KartButton";
 import { SpeakerPanel } from "./ui/SpeakerPanel";
 import { PeoplePanel } from "./ui/PeoplePanel";
 import { EditorPanel } from "./editor/EditorPanel";
@@ -421,6 +422,7 @@ function SpaceView() {
       <ChatPanel />
       {!editing && <EmoteBar />}
       {!editing && <DoorButton />}
+      {!editing && <KartButton />}
       {!editing && <SpeakerPanel />}
       <PeoplePanel />
       <MediaControls />
