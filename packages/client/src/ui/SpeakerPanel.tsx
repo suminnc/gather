@@ -35,11 +35,24 @@ function SpeakerAudio({
   };
   const frame = useRef<HTMLIFrameElement>(null);
 
-  const setVolume = (v: number) => {
+  const command = (func: string, args: unknown[] = []) => {
     frame.current?.contentWindow?.postMessage(
-      JSON.stringify({ event: "command", func: "setVolume", args: [v] }),
+      JSON.stringify({ event: "command", func, args }),
       "*"
     );
+  };
+  // Slider 0 is hard mute and 100 is the player's own max; in between,
+  // a squared curve spreads perceived loudness across the whole track
+  // (YouTube volume is linear, hearing isn't — linear feels like the
+  // left half does nothing and the right half does everything).
+  const setVolume = (v: number) => {
+    if (v <= 0) {
+      command("mute");
+      command("setVolume", [0]);
+    } else {
+      command("unMute");
+      command("setVolume", [Math.round(100 * (v / 100) ** 2)]);
+    }
   };
   useEffect(() => setVolume(volume), [volume]);
 
