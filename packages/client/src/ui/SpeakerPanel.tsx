@@ -43,17 +43,24 @@ function SpeakerAudio({
   };
   useEffect(() => setVolume(volume), [volume]);
 
-  if (info.provider === "youtube") {
-    if (!info.playing) return null;
+  // The start offset must be captured once per playback state. This
+  // component re-renders on every player step (the panel watches your
+  // position), and recomputing it from the clock rewrites the iframe src,
+  // reloading the player mid-song. Real state changes remount via `key`.
+  const [playerUrl] = useState(() => {
     const startSec = Math.floor(
       (info.timeMs + Math.max(0, Date.now() - info.updatedAt)) / 1000
     );
+    return `${musicEmbedUrl(src)}?autoplay=1&start=${startSec}&playsinline=1&enablejsapi=1`;
+  });
+
+  if (info.provider === "youtube") {
+    if (!info.playing) return null;
     return (
       <iframe
         ref={frame}
-        key={`${info.key}:${info.timeMs}:${info.updatedAt}`}
         className="speaker-audio"
-        src={`${musicEmbedUrl(src)}?autoplay=1&start=${startSec}&playsinline=1&enablejsapi=1`}
+        src={playerUrl}
         title={`Speaker ${id}`}
         allow="autoplay; encrypted-media"
         onLoad={() => {
@@ -163,7 +170,14 @@ export function SpeakerPanel() {
       </div>
 
       {playing.map((s) => (
-        <SpeakerAudio key={s.id} id={s.id} info={s.info} volume={vol} />
+        // Keyed on playback state so real changes (set/play/pause/seek)
+        // remount the player and recapture the start offset.
+        <SpeakerAudio
+          key={`${s.id}:${s.info.key}:${s.info.timeMs}:${s.info.updatedAt}`}
+          id={s.id}
+          info={s.info}
+          volume={vol}
+        />
       ))}
       {playing.some((s) => s.info.provider !== "youtube") && (
         <div className="music-hint">
