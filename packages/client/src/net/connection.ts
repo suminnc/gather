@@ -15,12 +15,14 @@ import {
   pushChat,
   removeKart,
   removePlayer,
+  removeSpeaker,
   removeTheater,
   setDoorLocked,
   setEmote,
   setKart,
   setChatHistory,
   setMap,
+  setSpeaker,
   setTheater,
   showEditorToast,
   updatePlayer,
@@ -169,6 +171,20 @@ export async function connect(
     removeTheater(zoneId);
   });
 
+  $(state).speakers.onAdd((sp: any, id: string) => {
+    const sync = () =>
+      setSpeaker(id, {
+        provider: sp.provider,
+        key: sp.key,
+        playing: sp.playing,
+        timeMs: sp.timeMs,
+        updatedAt: sp.updatedAt,
+      });
+    $(sp).onChange(sync);
+    sync();
+  });
+  $(state).speakers.onRemove((_sp: any, id: string) => removeSpeaker(id));
+
   $(state).karts.onAdd((k: any, id: string) => {
     const sync = () => setKart(id, { x: k.x, y: k.y, rider: k.rider });
     $(k).onChange(sync);
@@ -287,6 +303,15 @@ export function sendKartDismount(): void {
 
 export function sendEmote(emote: number): void {
   room?.send(MSG.emote, { emote });
+}
+
+export function sendSpeaker(
+  id: string,
+  action: "set" | "play" | "pause" | "stop",
+  url?: string,
+  timeMs?: number
+): void {
+  room?.send(MSG.speaker, { id, action, url, timeMs });
 }
 
 export function sendTheater(

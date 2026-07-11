@@ -20,12 +20,23 @@ export const DOOR_GID = 28;
 export const KART_GID = 32;
 /** Riding a kart halves the per-tile hop duration. */
 export const KART_SPEED_FACTOR = 2;
+/** The wall speaker object: place one to play music for its whole room. */
+export const SPEAKER_GID = 26;
+/** Chebyshev tile distance within which a speaker can be controlled. */
+export const SPEAKER_CONTROL_DIST = 2;
 
 /** Custom tile gids start here so they never collide with sheet frames. */
 export const CUSTOM_GID_BASE = 1000;
 export const MAX_CUSTOM_TILES = 64;
-/** Byte cap per custom-tile PNG data URL (a 32×32 PNG is usually <2 KB). */
-export const MAX_CUSTOM_TILE_DATA = 8192;
+/**
+ * Stored resolution of a custom tile (pixels per side). Twice the world
+ * tile size, so at the default 2× camera zoom the art renders 1:1.
+ */
+export const CUSTOM_TILE_RES = 64;
+/** Byte cap per custom-tile PNG data URL (drawn art or a downscaled import). */
+export const MAX_CUSTOM_TILE_DATA = 32768;
+/** Combined cap so mapJson stays well inside the state-sync buffer. */
+export const MAX_CUSTOM_TILES_TOTAL_DATA = 512 * 1024;
 
 /** Nearby chat reaches players in the same zone or within this tile distance. */
 export const NEARBY_CHAT_DIST = DISCONNECT_DIST;

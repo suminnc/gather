@@ -41,6 +41,10 @@ function PadButton({ pad }: { pad: Pad }) {
       style={{ gridColumn: pad.col, gridRow: pad.row }}
       onPointerDown={(e) => {
         e.preventDefault();
+        // preventDefault also blocks the focus change, so a focused chat
+        // input would keep the typing lock and eat the movement. Pressing
+        // the pad is an explicit move intent: drop the keyboard focus.
+        (document.activeElement as HTMLElement | null)?.blur?.();
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
         } catch {

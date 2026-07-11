@@ -43,7 +43,8 @@ function TileSwatch({
         className="swatch-img"
         style={
           custom
-            ? { backgroundImage: `url(${custom})` }
+            ? // Custom designs are stored above swatch size; scale to fit.
+              { backgroundImage: `url(${custom})`, backgroundSize: "100% 100%" }
             : {
                 backgroundImage: "url(/assets/tiles/tiles.png)",
                 backgroundPosition: `-${(gid % 8) * 32}px -${Math.floor(gid / 8) * 32}px`,

@@ -2,6 +2,7 @@ import {
   CUSTOM_GID_BASE,
   MAX_CUSTOM_TILES,
   MAX_CUSTOM_TILE_DATA,
+  MAX_CUSTOM_TILES_TOTAL_DATA,
   MAX_MAP_SIZE,
 } from "./constants";
 
@@ -17,7 +18,7 @@ export interface CustomTile {
   /** Stable id ≥ CUSTOM_GID_BASE so it never collides with sheet frames. */
   gid: number;
   kind: "floor" | "wall" | "object";
-  /** 32×32 PNG data URL. */
+  /** Square PNG data URL, up to CUSTOM_TILE_RES per side. */
   data: string;
 }
 
@@ -138,6 +139,11 @@ export function validateMap(map: unknown): map is MapDoc {
   if (m.customTiles !== undefined) {
     if (!Array.isArray(m.customTiles)) return false;
     if (m.customTiles.length > MAX_CUSTOM_TILES) return false;
+    const totalData = m.customTiles.reduce(
+      (n, c) => n + (typeof c?.data === "string" ? c.data.length : 0),
+      0
+    );
+    if (totalData > MAX_CUSTOM_TILES_TOTAL_DATA) return false;
     const gids = new Set<number>();
     for (const c of m.customTiles) {
       if (

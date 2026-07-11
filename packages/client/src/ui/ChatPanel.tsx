@@ -197,6 +197,8 @@ export function ChatPanel() {
           onBlur={() => useStore.setState({ typingLock: false })}
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
+            // Hand the keyboard back to the game without closing chat.
+            if (e.key === "Escape") e.currentTarget.blur();
           }}
         />
       </div>

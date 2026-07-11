@@ -70,6 +70,16 @@ export interface TheaterMessage {
   timeMs?: number;
 }
 
+/** Music control for one placed speaker object (by map object id). */
+export interface SpeakerMessage {
+  id: string;
+  action: "set" | "play" | "pause" | "stop";
+  /** Pasted music link (for "set"); validated via parseMusicSource. */
+  url?: string;
+  /** Playback position for play/pause (YouTube only). */
+  timeMs?: number;
+}
+
 /** server -> client */
 export interface ProximityMessage {
   added: string[];
@@ -121,6 +131,7 @@ export const MSG = {
   kartMount: "kart:mount",
   kartDismount: "kart:dismount",
   emote: "emote",
+  speaker: "speaker",
   // server -> client
   proximity: "proximity",
   rtcRelay: "rtc:relay",

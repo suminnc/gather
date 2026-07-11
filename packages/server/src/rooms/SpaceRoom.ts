@@ -12,7 +12,10 @@ import {
   MAX_CLIENTS,
   MSG,
   NEARBY_CHAT_DIST,
+  parseMusicSource,
   PROXIMITY_TICK_MS,
+  SPEAKER_CONTROL_DIST,
+  SPEAKER_GID,
   zoneAt,
   isWalkable,
   inBounds,
@@ -25,9 +28,16 @@ import {
   type MoveMessage,
   type RtcSendMessage,
   type ScreenAnnounceMessage,
+  type SpeakerMessage,
   type TheaterMessage,
 } from "@gather/shared";
-import { Kart, Player, SpaceState, TheaterState } from "./schema/SpaceState";
+import {
+  Kart,
+  Player,
+  SpaceState,
+  SpeakerState,
+  TheaterState,
+} from "./schema/SpaceState";
 import { computeLinkDiff } from "../logic/proximity";
 import { loadMap, saveMap } from "../maps/store";
 import { authEnabled, verifyIdToken, type AuthUser } from "../auth/google";
@@ -117,6 +127,9 @@ export class SpaceRoom extends Room<SpaceState> {
     this.onMessage(MSG.kartDismount, (client) => this.dismount(client.sessionId));
     this.onMessage(MSG.emote, (client, msg: EmoteSendMessage) =>
       this.handleEmote(client, msg)
+    );
+    this.onMessage(MSG.speaker, (client, msg: SpeakerMessage) =>
+      this.handleSpeaker(client, msg)
     );
 
     this.resetKarts();
@@ -399,6 +412,13 @@ export class SpaceRoom extends Room<SpaceState> {
       );
       if (!stillDoor) this.state.doors.delete(key);
     }
+    // Music from speakers that were removed must not linger.
+    for (const id of [...this.state.speakers.keys()]) {
+      const still = this.map.objects.some(
+        (o) => o.id === id && o.gid === SPEAKER_GID
+      );
+      if (!still) this.state.speakers.delete(id);
+    }
     this.state.mapJson = JSON.stringify(this.map);
     this.state.mapVersion++;
     client.send(MSG.mapSaveResult, { ok: true });
@@ -431,6 +451,49 @@ export class SpaceRoom extends Room<SpaceState> {
     t.playing = msg.action === "play";
     t.timeMs = Math.max(0, Number(msg.timeMs) || 0);
     t.updatedAt = Date.now();
+  }
+
+  /**
+   * Music control for a placed speaker: only players standing near the
+   * speaker *and* in its room may drive it. A room is the speaker tile's
+   * zone; the un-zoned outside area counts as one room (zoneId "").
+   */
+  private handleSpeaker(client: Client, msg: SpeakerMessage) {
+    const p = this.state.players.get(client.sessionId);
+    if (!p) return;
+    const speaker = this.map.objects.find(
+      (o) => o.id === String(msg.id ?? "") && o.gid === SPEAKER_GID
+    );
+    if (!speaker) return;
+    if (
+      Math.max(Math.abs(p.x - speaker.x), Math.abs(p.y - speaker.y)) >
+      SPEAKER_CONTROL_DIST
+    )
+      return;
+    const room = zoneAt(this.map, speaker.x, speaker.y)?.id ?? "";
+    if (p.zoneId !== room) return;
+
+    if (msg.action === "set") {
+      const src = parseMusicSource(String(msg.url ?? ""));
+      if (!src) return;
+      const s = new SpeakerState();
+      s.provider = src.provider;
+      s.key = src.key;
+      s.playing = true;
+      s.timeMs = 0;
+      s.updatedAt = Date.now();
+      this.state.speakers.set(speaker.id, s);
+      return;
+    }
+    const s = this.state.speakers.get(speaker.id);
+    if (!s) return;
+    if (msg.action === "stop") {
+      this.state.speakers.delete(speaker.id);
+      return;
+    }
+    s.playing = msg.action === "play";
+    s.timeMs = Math.max(0, Number(msg.timeMs) || 0);
+    s.updatedAt = Date.now();
   }
 
   private proximityTick() {

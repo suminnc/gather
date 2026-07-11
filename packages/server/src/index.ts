@@ -8,8 +8,9 @@ import { WebSocketTransport } from "@colyseus/ws-transport";
 import { Encoder } from "@colyseus/schema";
 
 // mapJson (large maps + custom tile data URLs) blows through the encoder's
-// 8 KB default; size it to the ws transport's maxPayload.
-Encoder.BUFFER_SIZE = 1024 * 1024;
+// 8 KB default; size it to the ws transport's maxPayload. Custom tiles
+// alone may total MAX_CUSTOM_TILES_TOTAL_DATA (512 KB), so keep headroom.
+Encoder.BUFFER_SIZE = 2 * 1024 * 1024;
 import { MAX_CLIENTS } from "@gather/shared";
 import { SpaceRoom } from "./rooms/SpaceRoom";
 import {
@@ -98,7 +99,7 @@ const gameServer = new Server({
     // WebRTC SDP relays and full map:save payloads exceed ws's small
     // default maxPayload, and ws hard-closes the socket when a frame
     // does — which drops the player mid-session.
-    maxPayload: 1024 * 1024,
+    maxPayload: 2 * 1024 * 1024,
   }),
 });
 

@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import {
   AVATARS,
+  CUSTOM_TILE_RES,
   DOOR_GID,
   EMOTES,
   KART_GID,
@@ -80,6 +81,13 @@ const BASE_FRAMES = 64;
 const SHEET_COLS = 8;
 /** Live texture combining the base sheet with the map's custom tiles. */
 const TILES_KEY = "tiles-live";
+/**
+ * Cell size of the live texture. Custom tiles store CUSTOM_TILE_RES px of
+ * detail (imports stay sharp under camera zoom), so the whole sheet bakes
+ * at that size and layers/decor render scaled back down to TILE_SIZE.
+ */
+const CELL = CUSTOM_TILE_RES;
+const CELL_SCALE = TILE_SIZE / CELL;
 
 export class SpaceScene extends Phaser.Scene {
   private tilemap?: Phaser.Tilemaps.Tilemap;
@@ -365,14 +373,21 @@ export class SpaceScene extends Phaser.Scene {
     const total = BASE_FRAMES + customs.length;
     const rows = Math.ceil(total / SHEET_COLS);
     const canvas = document.createElement("canvas");
-    canvas.width = SHEET_COLS * TILE_SIZE;
-    canvas.height = rows * TILE_SIZE;
+    canvas.width = SHEET_COLS * CELL;
+    canvas.height = rows * CELL;
     const ctx = canvas.getContext("2d")!;
+    const base = this.textures.get("tiles").getSourceImage() as CanvasImageSource & {
+      width: number;
+      height: number;
+    };
+    // Base pixel art upscales nearest so it stays crisp in the bigger cells.
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
-      this.textures.get("tiles").getSourceImage() as CanvasImageSource,
+      base,
       0,
-      0
+      0,
+      (base.width * CELL) / TILE_SIZE,
+      (base.height * CELL) / TILE_SIZE
     );
 
     const frames = new Map<number, number>();
@@ -383,12 +398,16 @@ export class SpaceScene extends Phaser.Scene {
             const img = new Image();
             img.onload = () => {
               const f = BASE_FRAMES + i;
+              // Integer upscales are pixel art (old 32px designs): keep
+              // them crisp. Anything else (imported photos) blends.
+              ctx.imageSmoothingEnabled = CELL % img.width !== 0;
+              ctx.imageSmoothingQuality = "high";
               ctx.drawImage(
                 img,
-                (f % SHEET_COLS) * TILE_SIZE,
-                Math.floor(f / SHEET_COLS) * TILE_SIZE,
-                TILE_SIZE,
-                TILE_SIZE
+                (f % SHEET_COLS) * CELL,
+                Math.floor(f / SHEET_COLS) * CELL,
+                CELL,
+                CELL
               );
               frames.set(c.gid, f);
               resolve();
@@ -405,10 +424,10 @@ export class SpaceScene extends Phaser.Scene {
       tex.add(
         f,
         0,
-        (f % SHEET_COLS) * TILE_SIZE,
-        Math.floor(f / SHEET_COLS) * TILE_SIZE,
-        TILE_SIZE,
-        TILE_SIZE
+        (f % SHEET_COLS) * CELL,
+        Math.floor(f / SHEET_COLS) * CELL,
+        CELL,
+        CELL
       );
     }
     this.customFrames = frames;
@@ -430,24 +449,27 @@ export class SpaceScene extends Phaser.Scene {
     await this.prepareTiles(doc);
     if (seq !== this.buildSeq) return; // superseded by a newer build
 
+    // The map's tile grid stays TILE_SIZE in the world; the layers render
+    // from CELL-sized frames scaled back down (extra texel density keeps
+    // hi-res custom tiles sharp under camera zoom).
     this.tilemap = this.make.tilemap({
       width: doc.width,
       height: doc.height,
-      tileWidth: TILE_SIZE,
-      tileHeight: TILE_SIZE,
+      tileWidth: CELL,
+      tileHeight: CELL,
     });
     const tileset = this.tilemap.addTilesetImage(
       TILES_KEY,
       TILES_KEY,
-      TILE_SIZE,
-      TILE_SIZE,
+      CELL,
+      CELL,
       0,
       0
     )!;
     this.floorLayer = this.tilemap.createBlankLayer("floor", tileset)!;
     this.wallsLayer = this.tilemap.createBlankLayer("walls", tileset)!;
-    this.floorLayer.setDepth(0);
-    this.wallsLayer.setDepth(1);
+    this.floorLayer.setDepth(0).setScale(CELL_SCALE);
+    this.wallsLayer.setDepth(1).setScale(CELL_SCALE);
     this.fillLayers(doc);
     this.redrawDecor(doc);
 
@@ -488,12 +510,16 @@ export class SpaceScene extends Phaser.Scene {
     this.decor.forEach((o) => o.destroy());
     this.decor = [];
     this.doorSprites.clear();
+    const editing = useStore.getState().editor.active;
     for (const obj of doc.objects) {
       const frame = this.frameForGid(obj.gid);
       if (frame < 0) continue; // design was deleted
-      if (obj.gid === KART_GID) continue; // karts render from live state
+      // Live karts render from runtime state; in the editor the draft's
+      // kart objects draw like any decor so placement is visible.
+      if (obj.gid === KART_GID && !editing) continue;
       const img = this.add
         .image(px(obj.x), px(obj.y), TILES_KEY, frame)
+        .setScale(CELL_SCALE)
         .setDepth(px(obj.y));
       if (obj.gid === DOOR_GID) {
         this.doorSprites.set(`${obj.x},${obj.y}`, img);
@@ -639,7 +665,7 @@ export class SpaceScene extends Phaser.Scene {
     entry.sprite.y = info.sitting ? 6 : 0;
     if (info.riding && !entry.kart) {
       const frame = this.frameForGid(KART_GID);
-      entry.kart = this.add.image(0, 6, TILES_KEY, frame);
+      entry.kart = this.add.image(0, 6, TILES_KEY, frame).setScale(CELL_SCALE);
       entry.container.addAt(entry.kart, 0);
     } else if (!info.riding && entry.kart) {
       entry.kart.destroy();
@@ -658,7 +684,9 @@ export class SpaceScene extends Phaser.Scene {
       }
       if (!img) {
         const frame = this.frameForGid(KART_GID);
-        img = this.add.image(px(kart.x), px(kart.y), TILES_KEY, frame);
+        img = this.add
+          .image(px(kart.x), px(kart.y), TILES_KEY, frame)
+          .setScale(CELL_SCALE);
         this.kartSprites.set(id, img);
       }
       img.setPosition(px(kart.x), px(kart.y)).setDepth(px(kart.y) - 1);

@@ -35,6 +35,17 @@ export class TheaterState extends Schema {
   @type("number") updatedAt = 0;
 }
 
+/** Music playing from one placed speaker object; heard room-wide. */
+export class SpeakerState extends Schema {
+  /** Validated music source: "provider:key" (see shared parseMusicSource). */
+  @type("string") provider = "";
+  @type("string") key = "";
+  @type("boolean") playing = false;
+  /** Playback position at `updatedAt` (YouTube sync only). */
+  @type("number") timeMs = 0;
+  @type("number") updatedAt = 0;
+}
+
 export class SpaceState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>();
   /** Serialized MapDoc; only changes on explicit editor save. */
@@ -47,4 +58,6 @@ export class SpaceState extends Schema {
   @type({ map: Kart }) karts = new MapSchema<Kart>();
   /** "x,y" -> locked, for door objects. Runtime-only state. */
   @type({ map: "boolean" }) doors = new MapSchema<boolean>();
+  /** speaker object id -> music playback. Runtime-only state. */
+  @type({ map: SpeakerState }) speakers = new MapSchema<SpeakerState>();
 }

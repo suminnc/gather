@@ -63,12 +63,14 @@ export function drawAvatarSheet(
         rect(ox + 12, oy + 8, 2, 2, "#1c1c1c");
         rect(ox + 18, oy + 8, 2, 2, "#1c1c1c");
       } else if (row === 1) {
-        rect(ox + 10, oy + 3, 12, 4, c.hair);
-        rect(ox + 10, oy + 3, 4, 8, c.hair);
-        rect(ox + 12, oy + 8, 2, 2, "#1c1c1c");
-      } else if (row === 2) {
+        // left: eye on the leading (left) edge, hair down the back
         rect(ox + 10, oy + 3, 12, 4, c.hair);
         rect(ox + 18, oy + 3, 4, 8, c.hair);
+        rect(ox + 12, oy + 8, 2, 2, "#1c1c1c");
+      } else if (row === 2) {
+        // right: mirrored
+        rect(ox + 10, oy + 3, 12, 4, c.hair);
+        rect(ox + 10, oy + 3, 4, 8, c.hair);
         rect(ox + 18, oy + 8, 2, 2, "#1c1c1c");
       } else {
         rect(ox + 10, oy + 3, 12, 9, c.hair);

@@ -37,6 +37,16 @@ export interface TheaterInfo {
   updatedAt: number;
 }
 
+/** Music playing from one placed speaker object. */
+export interface SpeakerInfo {
+  provider: string;
+  key: string;
+  playing: boolean;
+  timeMs: number;
+  /** Server wall-clock when timeMs was captured. */
+  updatedAt: number;
+}
+
 export type EditorTool =
   | "floor"
   | "wall"
@@ -103,6 +113,12 @@ interface GatherStore {
   /** Keep peer cameras visible on top of the theater overlay. */
   theaterCams: boolean;
   karts: Map<string, KartInfo>;
+  /** speaker object id -> music playback. */
+  speakers: Map<string, SpeakerInfo>;
+  /** Full-screen Zoom-style grid of everyone's cameras. */
+  videoGallery: boolean;
+  /** Enlarged video tile: "cam:me" | "screen:me" | "cam:<id>" | "screen:<id>". */
+  pinnedTile: string | null;
   /** "x,y" keys of locked door objects. */
   lockedDoors: Set<string>;
   /** sessionId -> latest reaction; seq bumps so repeats retrigger. */
@@ -151,6 +167,9 @@ export const useStore = create<GatherStore>()(
       theaters: new Map(),
       theaterCams: localStorage.getItem("gather:theaterCams") !== "0",
       karts: new Map(),
+      speakers: new Map(),
+      videoGallery: false,
+      pinnedTile: null,
       lockedDoors: new Set(),
       emotes: new Map(),
       dmRequest: null,
@@ -218,6 +237,29 @@ export function removeKart(id: string): void {
     karts.delete(id);
     return { karts };
   });
+}
+
+export function setSpeaker(id: string, info: SpeakerInfo): void {
+  useStore.setState((s) => ({ speakers: new Map(s.speakers).set(id, info) }));
+}
+
+export function removeSpeaker(id: string): void {
+  useStore.setState((s) => {
+    const speakers = new Map(s.speakers);
+    speakers.delete(id);
+    return { speakers };
+  });
+}
+
+export function setVideoGallery(open: boolean): void {
+  useStore.setState({ videoGallery: open });
+}
+
+/** Pin a tile (click again to unpin). */
+export function togglePinnedTile(key: string): void {
+  useStore.setState((s) => ({
+    pinnedTile: s.pinnedTile === key ? null : key,
+  }));
 }
 
 export function setDoorLocked(key: string, locked: boolean): void {

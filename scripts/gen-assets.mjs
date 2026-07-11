@@ -260,14 +260,14 @@ AVATAR_COLORS.forEach((shirtHex, idx) => {
         c.rect(ox + 12, oy + 8, 2, 2, hex("#1c1c1c"));
         c.rect(ox + 18, oy + 8, 2, 2, hex("#1c1c1c"));
       } else if (row === 1) {
-        // left
-        c.rect(ox + 10, oy + 3, 12, 4, hair);
-        c.rect(ox + 10, oy + 3, 4, 8, hair);
-        c.rect(ox + 12, oy + 8, 2, 2, hex("#1c1c1c"));
-      } else if (row === 2) {
-        // right
+        // left: eye on the leading (left) edge, hair down the back
         c.rect(ox + 10, oy + 3, 12, 4, hair);
         c.rect(ox + 18, oy + 3, 4, 8, hair);
+        c.rect(ox + 12, oy + 8, 2, 2, hex("#1c1c1c"));
+      } else if (row === 2) {
+        // right: mirrored
+        c.rect(ox + 10, oy + 3, 12, 4, hair);
+        c.rect(ox + 10, oy + 3, 4, 8, hair);
         c.rect(ox + 18, oy + 8, 2, 2, hex("#1c1c1c"));
       } else {
         // up: back of head
