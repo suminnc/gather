@@ -452,7 +452,8 @@ function SpaceView() {
       {!editing && <EmoteBar />}
       {!editing && <DoorButton />}
       {!editing && <KartButton />}
-      {!editing && <SpeakerPanel />}
+      {/* Stays mounted while editing so the room music keeps playing. */}
+      <SpeakerPanel />
       <PeoplePanel />
       <MediaControls />
       <TouchControls />
